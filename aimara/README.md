@@ -20,3 +20,28 @@ Use `--no-audio` to validate and convert annotations without running FFmpeg.
 The manifest deliberately omits MELD's optional `Sentiment` field to avoid
 deriving an input feature from the ground-truth emotion label.
 
+## ROB speech dependencies
+
+The VAD adapter uses PyTorch and the Silero model loaded through Torch Hub. The
+ASR adapter uses the same Faster-Whisper version pinned by the ROB repository:
+
+```bash
+python -m pip install faster-whisper==1.2.1
+```
+
+Model loading is explicit so importing `aimara` does not initialize or download
+either model:
+
+```python
+from aimara.rob import ROBTranscriber, ROBVoiceActivityDetector
+
+vad = ROBVoiceActivityDetector.from_torch_hub(
+    weights_dir="/path/to/vad-weights",
+)
+asr = ROBTranscriber.from_faster_whisper(
+    model_size="turbo",
+    weights_dir="/path/to/asr-weights",
+    compute_type="float16",
+    language="es,ca",
+)
+```
