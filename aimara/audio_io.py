@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import wave
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
@@ -58,3 +59,35 @@ def decode_audio(
     if audio.size == 0:
         raise ValueError(f"No audio samples decoded from {path}")
     return audio
+
+
+def write_wav(
+    path: Union[str, Path],
+    audio: "np.ndarray",
+    *,
+    sample_rate: int = 16000,
+) -> Path:
+    """Write mono float32 audio as a standard 16-bit PCM WAV file."""
+    try:
+        import numpy as np
+    except ImportError as exc:
+        raise RuntimeError("NumPy is required to write audio") from exc
+
+    if getattr(audio, "ndim", None) != 1:
+        raise ValueError("audio must be a one-dimensional array")
+    if str(getattr(audio, "dtype", "")) != "float32":
+        raise TypeError("audio must use float32 samples")
+    if audio.size == 0:
+        raise ValueError("audio must not be empty")
+    if sample_rate <= 0:
+        raise ValueError("sample_rate must be positive")
+
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    pcm = np.clip(audio * 32768.0, -32768, 32767).astype("<i2")
+    with wave.open(str(output_path), "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(pcm.tobytes())
+    return output_path

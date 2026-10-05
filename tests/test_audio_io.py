@@ -1,13 +1,14 @@
 import subprocess
 import tempfile
 import unittest
+import wave
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
 
-from aimara.audio_io import decode_audio
+from aimara.audio_io import decode_audio, write_wav
 
 
 class DecodeAudioTests(unittest.TestCase):
@@ -48,3 +49,23 @@ class DecodeAudioTests(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "invalid media"):
             decode_audio(self.media_path)
+
+
+class WriteWavTests(unittest.TestCase):
+    def test_writes_mono_16_bit_pcm(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "nested" / "segment.wav"
+
+            result = write_wav(
+                path,
+                np.array([-1.0, 0.0, 1.0], dtype=np.float32),
+                sample_rate=16000,
+            )
+
+            with wave.open(str(path), "rb") as wav_file:
+                self.assertEqual(wav_file.getnchannels(), 1)
+                self.assertEqual(wav_file.getsampwidth(), 2)
+                self.assertEqual(wav_file.getframerate(), 16000)
+                samples = np.frombuffer(wav_file.readframes(3), dtype="<i2")
+            self.assertEqual(result, path)
+            self.assertEqual(samples.tolist(), [-32768, 0, 32767])

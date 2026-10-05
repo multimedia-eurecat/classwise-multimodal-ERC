@@ -1,7 +1,8 @@
 """AIMARA integration utilities."""
 
-from .audio_io import decode_audio
+from .audio_io import decode_audio, write_wav
 from .domain import SpeechSegment
+from .offline_processor import OfflineROBProcessor
 from .segmentation import SpeechRegion, VADSegmenter
 from .speech_interfaces import (
     ROBProcessorConfig,
@@ -13,6 +14,7 @@ from .vad_processing import OfflineVADProcessor
 
 __all__ = [
     "decode_audio",
+    "OfflineROBProcessor",
     "OfflineVADProcessor",
     "ROBProcessorConfig",
     "SpeechRegion",
@@ -21,4 +23,5 @@ __all__ = [
     "Transcriber",
     "VADSegmenter",
     "VoiceActivityDetector",
+    "write_wav",
 ]

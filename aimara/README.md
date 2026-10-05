@@ -45,3 +45,23 @@ asr = ROBTranscriber.from_faster_whisper(
     language="es,ca",
 )
 ```
+
+The models are composed by the offline processor, which writes one WAV and
+returns one `SpeechSegment` per VAD region:
+
+```python
+from aimara import OfflineROBProcessor, OfflineVADProcessor, ROBProcessorConfig
+
+config = ROBProcessorConfig()
+processor = OfflineROBProcessor(
+    vad_processor=OfflineVADProcessor(vad, config),
+    transcriber=asr,
+)
+segments = processor.process_video(
+    "/path/to/video.mp4",
+    "/path/to/output",
+)
+```
+
+Speaker IDs are currently set to `UNKNOWN` because diarization is intentionally
+outside this integration's scope.
