@@ -1,7 +1,7 @@
 import unittest
 from dataclasses import FrozenInstanceError
 
-from aimara import ROBProcessorConfig, SpeakerTurn, Transcript
+from aimara import ROBProcessorConfig, Transcript
 
 
 class SpeechInterfaceValueTests(unittest.TestCase):
@@ -32,19 +32,6 @@ class SpeechInterfaceValueTests(unittest.TestCase):
             with self.subTest(overrides=overrides):
                 with self.assertRaisesRegex(ValueError, message):
                     ROBProcessorConfig(**overrides)
-
-    def test_speaker_turn_validates_interval_and_speaker(self):
-        turn = SpeakerTurn(1.25, 2.75, "EUT_SPEAKER_1")
-
-        self.assertEqual(turn.duration, 1.5)
-        for values, message in [
-            ((-0.1, 1.0, "speaker"), "start_time"),
-            ((1.0, 1.0, "speaker"), "end_time"),
-            ((0.0, 1.0, " "), "speaker_id"),
-        ]:
-            with self.subTest(values=values):
-                with self.assertRaisesRegex(ValueError, message):
-                    SpeakerTurn(*values)
 
     def test_transcript_allows_empty_asr_result_and_is_immutable(self):
         transcript = Transcript(text="", language=None)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Protocol, Sequence
+from typing import TYPE_CHECKING, Optional, Protocol
 
 if TYPE_CHECKING:
     import numpy as np
@@ -15,27 +15,6 @@ class Transcript:
 
     text: str
     language: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class SpeakerTurn:
-    """A diarized speaker assignment over an audio interval."""
-
-    start_time: float
-    end_time: float
-    speaker_id: str
-
-    def __post_init__(self) -> None:
-        if self.start_time < 0:
-            raise ValueError("start_time must be non-negative")
-        if self.end_time <= self.start_time:
-            raise ValueError("end_time must be greater than start_time")
-        if not self.speaker_id.strip():
-            raise ValueError("speaker_id must not be empty")
-
-    @property
-    def duration(self) -> float:
-        return self.end_time - self.start_time
 
 
 @dataclass(frozen=True)
@@ -82,11 +61,4 @@ class Transcriber(Protocol):
     """Transcribe one finalized speech interval."""
 
     def transcribe(self, audio: np.ndarray, sample_rate: int) -> Transcript:
-        ...
-
-
-class Diarizer(Protocol):
-    """Return speaker turns for a complete audio recording."""
-
-    def diarize(self, audio: np.ndarray, sample_rate: int) -> Sequence[SpeakerTurn]:
         ...
