@@ -65,3 +65,34 @@ segments = processor.process_video(
 
 Speaker IDs are currently set to `UNKNOWN` because diarization is intentionally
 outside this integration's scope.
+
+## ERC feature bridge
+
+The feature bridge converts the ordered `SpeechSegment` objects into the text,
+audio, and visual feature matrices expected by the ERC transformer. The
+adapters reuse the existing unimodal model helpers; importing them does not load
+any model or download weights.
+
+```python
+from aimara import ERCFeatureBridge
+from aimara.erc_encoders import (
+    OriolAudioEncoder,
+    OriolTextEncoder,
+    OriolVisualEncoder,
+)
+
+bridge = ERCFeatureBridge(
+    text_encoder=OriolTextEncoder.load(),
+    audio_encoder=OriolAudioEncoder.load(),
+    visual_encoder=OriolVisualEncoder.load(),
+    speaker_slots=2,
+)
+features = bridge.build(segments)
+model_inputs = features.to_torch_batch(device="cuda")
+outputs = model(**model_inputs)
+```
+
+Text context is causal and never includes reference sentiment or emotion
+labels. Until diarization is added, all `UNKNOWN` speakers map to speaker slot
+zero. The selected checkpoint must have the same text, audio, visual, and
+speaker dimensions as the loaded encoders.

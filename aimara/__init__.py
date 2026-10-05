@@ -2,6 +2,7 @@
 
 from .audio_io import decode_audio, write_wav
 from .domain import SpeechSegment
+from .erc_features import ConversationFeatures, ERCFeatureBridge, SegmentFeatureEncoder
 from .offline_processor import OfflineROBProcessor
 from .segmentation import SpeechRegion, VADSegmenter
 from .speech_interfaces import (
@@ -14,11 +15,14 @@ from .vad_processing import OfflineVADProcessor
 
 __all__ = [
     "decode_audio",
+    "ConversationFeatures",
+    "ERCFeatureBridge",
     "OfflineROBProcessor",
     "OfflineVADProcessor",
     "ROBProcessorConfig",
     "SpeechRegion",
     "SpeechSegment",
+    "SegmentFeatureEncoder",
     "Transcript",
     "Transcriber",
     "VADSegmenter",
