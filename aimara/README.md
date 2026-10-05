@@ -96,3 +96,26 @@ Text context is causal and never includes reference sentiment or emotion
 labels. Until diarization is added, all `UNKNOWN` speakers map to speaker slot
 zero. The selected checkpoint must have the same text, audio, visual, and
 speaker dimensions as the loaded encoders.
+
+Run the complete ROB VAD/ASR to IEMOCAP ERC pipeline with:
+
+```bash
+LD_PRELOAD=/home/Imatge/media/ssd2/oriol/sdt_env/lib/libpng16.so.16 \
+python -m aimara.run_pipeline \
+  --video /home/Imatge/media/ssd2/AIMARA/videos/selfie-videos/Anger.mp4 \
+  --checkpoint /home/Imatge/media/ssd2/oriol/checkpoints/IEMOCAP/final/vit_softmax.pt \
+  --output-dir /tmp/aimara-erc-anger \
+  --vad-weights /tmp/aimara-silero \
+  --asr-weights /home/Imatge/media/ssd2/AIMARA/models/faster-whisper \
+  --asr-model tiny.en \
+  --audio-model /home/Imatge/media/ssd2/AIMARA/evaluation_pipeline/models/modelscope/iic/emotion2vec_plus_large \
+  --language en \
+  --device cpu
+```
+
+The `LD_PRELOAD` prefix is currently needed in `aimara_env` because its OpenCV
+package otherwise resolves an incompatible bundled `libpng`. It can be removed
+once that environment's OpenCV/libpng installation is repaired.
+
+The command writes segment WAV files under `audio/` and the aligned transcript,
+timing, emotion, confidence, and class probabilities to `predictions.json`.

@@ -3,6 +3,7 @@
 from .audio_io import decode_audio, write_wav
 from .domain import SpeechSegment
 from .erc_features import ConversationFeatures, ERCFeatureBridge, SegmentFeatureEncoder
+from .erc_model import ERCEmotionModel, ERCModelProfile, EmotionPrediction
 from .offline_processor import OfflineROBProcessor
 from .segmentation import SpeechRegion, VADSegmenter
 from .speech_interfaces import (
@@ -17,6 +18,9 @@ __all__ = [
     "decode_audio",
     "ConversationFeatures",
     "ERCFeatureBridge",
+    "ERCEmotionModel",
+    "ERCModelProfile",
+    "EmotionPrediction",
     "OfflineROBProcessor",
     "OfflineVADProcessor",
     "ROBProcessorConfig",
