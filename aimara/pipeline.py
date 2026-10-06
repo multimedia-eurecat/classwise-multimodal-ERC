@@ -39,8 +39,10 @@ class AIMARAPipeline:
             predictions = self.emotion_model.predict(features)
 
         result_path = output_dir / "predictions.json"
-        result_path.write_text(
+        temporary_path = result_path.with_suffix(".json.tmp")
+        temporary_path.write_text(
             json.dumps([item.to_dict() for item in predictions], indent=2) + "\n",
             encoding="utf-8",
         )
+        temporary_path.replace(result_path)
         return predictions

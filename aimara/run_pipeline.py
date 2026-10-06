@@ -16,11 +16,8 @@ from .speech_interfaces import ROBProcessorConfig
 from .vad_processing import OfflineVADProcessor
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--video", type=Path, required=True)
+def add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--vad-weights", type=Path, required=True)
     parser.add_argument("--asr-weights", type=Path, required=True)
     parser.add_argument("--asr-model", default="tiny.en")
@@ -31,6 +28,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--language", default="en")
     parser.add_argument("--device", choices=("cpu", "cuda"), default=None)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--video", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
+    add_runtime_arguments(parser)
     return parser
 
 

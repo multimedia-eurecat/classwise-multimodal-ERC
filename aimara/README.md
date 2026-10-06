@@ -119,3 +119,34 @@ once that environment's OpenCV/libpng installation is repaired.
 
 The command writes segment WAV files under `audio/` and the aligned transcript,
 timing, emotion, confidence, and class probabilities to `predictions.json`.
+
+## Batch evaluation
+
+The batch runner loads every model once and processes all MP4 files in one
+directory. Start the clean selfie-video evaluation in a detachable session:
+
+```bash
+tmux new -s aimara-eval
+
+LD_PRELOAD=/home/Imatge/media/ssd2/oriol/sdt_env/lib/libpng16.so.16 \
+python -m aimara.run_batch \
+  --video-dir /home/Imatge/media/ssd2/AIMARA/videos/selfie-videos \
+  --output-dir /home/Imatge/media/ssd2/AIMARA/output/rob-erc-selfie-videos \
+  --checkpoint /home/Imatge/media/ssd2/oriol/checkpoints/IEMOCAP/final/vit_softmax.pt \
+  --vad-weights /tmp/aimara-silero \
+  --asr-weights /home/Imatge/media/ssd2/AIMARA/models/faster-whisper \
+  --asr-model tiny.en \
+  --audio-model /home/Imatge/media/ssd2/AIMARA/evaluation_pipeline/models/modelscope/iic/emotion2vec_plus_large \
+  --language en \
+  --device cpu 2>&1 | tee /tmp/aimara-rob-erc-selfie-videos.log
+```
+
+Detach with `Ctrl+B`, then `D`, and reconnect with
+`tmux attach -t aimara-eval`. Add `--resume` when restarting an interrupted
+run. A valid per-video `predictions.json` is reused; incomplete or malformed
+results are rerun.
+
+The output root contains combined `predictions.csv`, `predictions.json`, and
+`failures.json` files. Each video also receives its own directory containing
+segment WAVs and its individual `predictions.json`. A failure is recorded and
+does not stop later videos from running.
