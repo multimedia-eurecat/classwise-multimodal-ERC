@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 
-from ..speech_interfaces import Transcript
+from ..speech_interfaces import Transcript, TranscriptSegment, TranscriptWord
 
 if TYPE_CHECKING:
     import numpy as np
@@ -153,7 +153,7 @@ class ROBTranscriber:
         )
 
     def transcribe(self, audio: "np.ndarray", sample_rate: int) -> Transcript:
-        """Synchronously transcribe one mono float32 speech interval."""
+        """Transcribe a mono float32 interval, retaining input-relative timings."""
         if getattr(audio, "ndim", None) != 1:
             raise ValueError("audio must be a one-dimensional array")
         if str(getattr(audio, "dtype", "")) != "float32":
@@ -169,15 +169,37 @@ class ROBTranscriber:
             segments, info = self._model.transcribe(
                 audio,
                 vad_filter=False,
-                word_timestamps=False,
+                word_timestamps=True,
                 language=transcription_language,
             )
-            text = " ".join(segment.text.strip() for segment in segments).strip()
+            # Materialize the lazy backend generator once so text and timings
+            # describe the same decode, including errors raised during iteration.
+            timed_segments = tuple(
+                TranscriptSegment(
+                    start_time=float(segment.start),
+                    end_time=float(segment.end),
+                    text=segment.text.strip(),
+                    words=tuple(
+                        TranscriptWord(
+                            start_time=float(word.start),
+                            end_time=float(word.end),
+                            text=word.word,
+                        )
+                        for word in (getattr(segment, "words", None) or ())
+                        if word.word.strip()
+                    ),
+                )
+                for segment in segments
+                if segment.text.strip()
+            )
+            text = " ".join(segment.text for segment in timed_segments)
         except Exception as exc:
             raise RuntimeError("Faster-Whisper transcription failed") from exc
 
         detected_language = getattr(info, "language", transcription_language)
-        return Transcript(text=text, language=detected_language)
+        return Transcript(
+            text=text, language=detected_language, segments=timed_segments
+        )
 
     def _resolve_language(self, audio: "np.ndarray") -> str:
         if self.model_size.endswith(".en"):
@@ -186,7 +208,9 @@ class ROBTranscriber:
             return self._detect_language(audio, self.allowed_languages)
         if "," in self.language:
             requested = tuple(
-                language.strip() for language in self.language.split(",") if language.strip()
+                language.strip()
+                for language in self.language.split(",")
+                if language.strip()
             )
             return self._detect_language(audio, requested)
         return self.language
@@ -207,5 +231,7 @@ class ROBTranscriber:
                 return max(matches, key=lambda item: item[1])[0]
             return detected if not allowed else fallback
         except Exception as exc:
-            self._logger.warning("ASR language detection failed; using %s: %s", fallback, exc)
+            self._logger.warning(
+                "ASR language detection failed; using %s: %s", fallback, exc
+            )
             return fallback

@@ -1,7 +1,7 @@
 import unittest
 from dataclasses import FrozenInstanceError
 
-from aimara import ROBProcessorConfig, Transcript
+from aimara import ROBProcessorConfig, Transcript, TranscriptSegment, TranscriptWord
 
 
 class SpeechInterfaceValueTests(unittest.TestCase):
@@ -39,6 +39,44 @@ class SpeechInterfaceValueTests(unittest.TestCase):
         self.assertEqual(transcript.text, "")
         with self.assertRaises(FrozenInstanceError):
             transcript.text = "changed"
+
+    def test_legacy_transcript_construction_still_has_empty_timing(self):
+        transcript = Transcript("hello", "en")
+        self.assertEqual(transcript.segments, ())
+        self.assertEqual(transcript.words, ())
+
+    def test_timed_transcript_snapshots_mutable_backend_collections(self):
+        word = TranscriptWord(0.1, 0.5, " hello")
+        words = [word]
+        segment = TranscriptSegment(0, 0.5, "hello", words)
+        segments = [segment]
+        transcript = Transcript("hello", "en", segments)
+        words.clear()
+        segments.clear()
+        self.assertEqual(transcript.segments, (segment,))
+        self.assertEqual(transcript.words, (word,))
+        with self.assertRaises(FrozenInstanceError):
+            word.start_time = 1
+        with self.assertRaises(FrozenInstanceError):
+            segment.words = ()
+
+    def test_timed_values_reject_invalid_offsets_and_allow_zero_duration(self):
+        for value_type in (TranscriptWord, TranscriptSegment):
+            for start, end in [(-0.1, 0), (1, 0), (0, float("inf")), (float("nan"), 1)]:
+                with (
+                    self.subTest(value_type=value_type, start=start, end=end),
+                    self.assertRaises(ValueError),
+                ):
+                    value_type(start, end, "hi")
+            self.assertEqual(value_type(0.5, 0.5, "hi").end_time, 0.5)
+
+    def test_timed_contract_rejects_invalid_nested_values_and_blank_words(self):
+        with self.assertRaisesRegex(TypeError, "TranscriptWord"):
+            TranscriptSegment(0, 1, "hello", words=["hello"])
+        with self.assertRaisesRegex(TypeError, "TranscriptSegment"):
+            Transcript("hello", segments=["hello"])
+        with self.assertRaisesRegex(ValueError, "word text"):
+            TranscriptWord(0, 1, " ")
 
 
 if __name__ == "__main__":

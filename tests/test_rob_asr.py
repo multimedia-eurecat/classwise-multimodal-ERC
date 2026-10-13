@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
-from aimara import Transcript
+from aimara import Transcript, TranscriptSegment, TranscriptWord
 from aimara.rob import ROBTranscriber
 
 
@@ -24,7 +24,10 @@ class FakeModel:
 
     def transcribe(self, audio, **kwargs):
         self.transcribe_calls.append((audio, kwargs))
-        segments = [SimpleNamespace(text=text) for text in self.texts]
+        segments = [
+            SimpleNamespace(text=text, start=i * 0.5, end=(i + 1) * 0.5, words=None)
+            for i, text in enumerate(self.texts)
+        ]
         return iter(segments), SimpleNamespace(language=self.detected_language)
 
     def detect_language(self, audio):
@@ -45,11 +48,130 @@ class ROBTranscriberTests(unittest.TestCase):
 
         result = transcriber.transcribe(self.audio(), 16000)
 
-        self.assertEqual(result, Transcript(text="hello world", language="en"))
+        self.assertEqual(result.text, "hello world")
+        self.assertEqual(result.language, "en")
+        self.assertEqual(
+            result.segments,
+            (
+                TranscriptSegment(0.0, 0.5, "hello"),
+                TranscriptSegment(0.5, 1.0, "world"),
+            ),
+        )
         kwargs = model.transcribe_calls[0][1]
         self.assertEqual(kwargs["language"], "en")
         self.assertFalse(kwargs["vad_filter"])
-        self.assertFalse(kwargs["word_timestamps"])
+        self.assertTrue(kwargs["word_timestamps"])
+
+    def test_preserves_word_punctuation_spacing_and_input_relative_offsets(self):
+        model = FakeModel()
+        model.transcribe = Mock(
+            return_value=(
+                iter(
+                    [
+                        SimpleNamespace(
+                            start=0.2,
+                            end=1.3,
+                            text=" Hello, world!",
+                            words=[
+                                SimpleNamespace(start=0.2, end=0.7, word=" Hello,"),
+                                SimpleNamespace(start=0.7, end=1.3, word=" world!"),
+                            ],
+                        ),
+                        SimpleNamespace(
+                            start=1.5,
+                            end=2.0,
+                            text=" Bye.",
+                            words=[
+                                SimpleNamespace(start=1.5, end=2.0, word=" Bye."),
+                            ],
+                        ),
+                    ]
+                ),
+                SimpleNamespace(language="en"),
+            )
+        )
+        result = ROBTranscriber(model=model, model_size="tiny.en").transcribe(
+            self.audio(seconds=2), 16000
+        )
+        self.assertEqual(result.text, "Hello, world! Bye.")
+        self.assertEqual(
+            result.words,
+            (
+                TranscriptWord(0.2, 0.7, " Hello,"),
+                TranscriptWord(0.7, 1.3, " world!"),
+                TranscriptWord(1.5, 2.0, " Bye."),
+            ),
+        )
+        self.assertEqual(result.segments[1].start_time, 1.5)
+
+    def test_skips_blank_segments_and_words_without_dropping_other_timing(self):
+        model = FakeModel()
+        model.transcribe = Mock(
+            return_value=(
+                iter(
+                    [
+                        SimpleNamespace(start=0, end=0.2, text=" ", words=None),
+                        SimpleNamespace(
+                            start=0.3,
+                            end=0.8,
+                            text=" hi",
+                            words=[
+                                SimpleNamespace(start=0.3, end=0.3, word=" "),
+                                SimpleNamespace(start=0.3, end=0.8, word=" hi"),
+                            ],
+                        ),
+                    ]
+                ),
+                SimpleNamespace(language="en"),
+            )
+        )
+        result = ROBTranscriber(model=model, model_size="tiny.en").transcribe(
+            self.audio(), 16000
+        )
+        self.assertEqual(result.text, "hi")
+        self.assertEqual(len(result.segments), 1)
+        self.assertEqual(result.words, (TranscriptWord(0.3, 0.8, " hi"),))
+
+    def test_empty_backend_output_returns_empty_text_and_timing(self):
+        transcriber = ROBTranscriber(model=FakeModel(texts=()), model_size="tiny.en")
+        self.assertEqual(
+            transcriber.transcribe(self.audio(), 16000), Transcript("", "en")
+        )
+
+    def test_lazy_backend_failure_does_not_return_a_partial_transcript(self):
+        def failing_segments():
+            yield SimpleNamespace(start=0, end=0.5, text="hello", words=None)
+            raise ValueError("decoder failed")
+
+        model = FakeModel()
+        model.transcribe = Mock(
+            return_value=(failing_segments(), SimpleNamespace(language="en"))
+        )
+        with self.assertRaisesRegex(RuntimeError, "transcription failed") as caught:
+            ROBTranscriber(model=model, model_size="tiny.en").transcribe(
+                self.audio(), 16000
+            )
+        self.assertIsInstance(caught.exception.__cause__, ValueError)
+
+    def test_invalid_backend_timestamp_fails_explicitly(self):
+        model = FakeModel()
+        model.transcribe = Mock(
+            return_value=(
+                iter(
+                    [
+                        SimpleNamespace(
+                            start=float("nan"), end=1, text="hi", words=None
+                        ),
+                    ]
+                ),
+                SimpleNamespace(language="en"),
+            )
+        )
+        with self.assertRaisesRegex(RuntimeError, "transcription failed") as caught:
+            ROBTranscriber(model=model, model_size="tiny.en").transcribe(
+                self.audio(), 16000
+            )
+        self.assertIn("finite", str(caught.exception.__cause__))
 
     def test_restricts_automatic_language_detection(self):
         model = FakeModel(detected_language="es")
@@ -88,9 +210,7 @@ class ROBTranscriberTests(unittest.TestCase):
         model = FakeModel()
         whisper_model = Mock(return_value=model)
         fake_faster_whisper = SimpleNamespace(WhisperModel=whisper_model)
-        fake_ctranslate2 = SimpleNamespace(
-            get_cuda_device_count=Mock(return_value=0)
-        )
+        fake_ctranslate2 = SimpleNamespace(get_cuda_device_count=Mock(return_value=0))
 
         with tempfile.TemporaryDirectory() as directory:
             with patch.dict(
@@ -118,9 +238,7 @@ class ROBTranscriberTests(unittest.TestCase):
         model = FakeModel()
         whisper_model = Mock(return_value=model)
         fake_faster_whisper = SimpleNamespace(WhisperModel=whisper_model)
-        fake_ctranslate2 = SimpleNamespace(
-            get_cuda_device_count=Mock(return_value=0)
-        )
+        fake_ctranslate2 = SimpleNamespace(get_cuda_device_count=Mock(return_value=0))
 
         with tempfile.TemporaryDirectory() as directory:
             snapshot = (

@@ -11,6 +11,8 @@ from .speech_interfaces import (
     ROBProcessorConfig,
     SpeakerDiarizer,
     Transcript,
+    TranscriptSegment,
+    TranscriptWord,
     Transcriber,
     VoiceActivityDetector,
 )
@@ -32,6 +34,8 @@ __all__ = [
     "SpeakerInterval",
     "SegmentFeatureEncoder",
     "Transcript",
+    "TranscriptSegment",
+    "TranscriptWord",
     "Transcriber",
     "VADSegmenter",
     "VoiceActivityDetector",

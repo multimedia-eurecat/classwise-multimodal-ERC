@@ -46,6 +46,24 @@ asr = ROBTranscriber.from_faster_whisper(
 )
 ```
 
+ASR requests word timestamps and returns an immutable `Transcript` containing
+joined `text`, `language`, timed `segments`, and a flattened `words` property.
+Each `TranscriptSegment` and `TranscriptWord` has `start_time`, `end_time`, and
+`text`. Times are estimated seconds relative to the audio passed to ASR, including
+its onset pre-buffer. Add the VAD region's start time to map them to the source
+video. Word text retains Whisper's leading spaces and punctuation.
+
+```python
+transcript = asr.transcribe(segment_audio, sample_rate=16000)
+for word in transcript.words:
+    print(word.start_time, word.end_time, word.text)
+```
+
+Segment boundaries are retained even when a backend returns no word timings.
+`Transcript(text, language)` remains valid for text-only adapters and test doubles.
+The offline processor currently uses the joined text; splitting VAD regions using
+word timings and the speaker timeline is the next integration step.
+
 The models are composed by the offline processor, which writes one WAV and
 returns one `SpeechSegment` per VAD region:
 
