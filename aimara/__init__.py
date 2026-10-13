@@ -2,12 +2,14 @@
 
 from .audio_io import decode_audio, write_wav
 from .domain import SpeechSegment
+from .diarization import SpeakerInterval
 from .erc_features import ConversationFeatures, ERCFeatureBridge, SegmentFeatureEncoder
 from .erc_model import ERCEmotionModel, ERCModelProfile, EmotionPrediction
 from .offline_processor import OfflineROBProcessor
 from .segmentation import SpeechRegion, VADSegmenter
 from .speech_interfaces import (
     ROBProcessorConfig,
+    SpeakerDiarizer,
     Transcript,
     Transcriber,
     VoiceActivityDetector,
@@ -26,6 +28,8 @@ __all__ = [
     "ROBProcessorConfig",
     "SpeechRegion",
     "SpeechSegment",
+    "SpeakerDiarizer",
+    "SpeakerInterval",
     "SegmentFeatureEncoder",
     "Transcript",
     "Transcriber",

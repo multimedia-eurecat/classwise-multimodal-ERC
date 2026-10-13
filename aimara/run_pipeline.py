@@ -11,7 +11,7 @@ from .erc_features import ERCFeatureBridge
 from .erc_model import ERCEmotionModel, ERCModelProfile
 from .offline_processor import OfflineROBProcessor
 from .pipeline import AIMARAPipeline
-from .rob import ROBTranscriber, ROBVoiceActivityDetector
+from .rob import ROBSpeakerDiarizer, ROBTranscriber, ROBVoiceActivityDetector
 from .speech_interfaces import ROBProcessorConfig
 from .vad_processing import OfflineVADProcessor
 
@@ -21,6 +21,10 @@ def add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--vad-weights", type=Path, required=True)
     parser.add_argument("--asr-weights", type=Path, required=True)
     parser.add_argument("--asr-model", default="tiny.en")
+    parser.add_argument(
+        "--diarization-backend", choices=("none", "redimnet2"), default="none"
+    )
+    parser.add_argument("--diarization-weights", type=Path)
     parser.add_argument(
         "--audio-model",
         default="iic/emotion2vec_plus_large",
@@ -39,6 +43,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def build_pipeline(args: argparse.Namespace) -> AIMARAPipeline:
+    diarization_backend = getattr(args, "diarization_backend", "none")
+    diarization_weights = getattr(args, "diarization_weights", None)
+    if diarization_backend == "redimnet2" and diarization_weights is None:
+        raise ValueError("--diarization-weights is required with --diarization-backend redimnet2")
     config = ROBProcessorConfig()
     vad = ROBVoiceActivityDetector.from_torch_hub(
         weights_dir=args.vad_weights,
@@ -53,6 +61,13 @@ def build_pipeline(args: argparse.Namespace) -> AIMARAPipeline:
     speech_processor = OfflineROBProcessor(
         vad_processor=OfflineVADProcessor(vad, config),
         transcriber=transcriber,
+        diarizer=(
+            ROBSpeakerDiarizer.from_torch_hub(
+                weights_dir=diarization_weights, device=args.device
+            )
+            if diarization_backend == "redimnet2"
+            else None
+        ),
     )
 
     profile = ERCModelProfile()

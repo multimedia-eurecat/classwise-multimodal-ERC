@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Protocol
+from typing import TYPE_CHECKING, Optional, Protocol, Sequence
 
 if TYPE_CHECKING:
     import numpy as np
+
+    from .diarization import SpeakerInterval
+    from .segmentation import SpeechRegion
 
 
 @dataclass(frozen=True)
@@ -61,4 +64,16 @@ class Transcriber(Protocol):
     """Transcribe one finalized speech interval."""
 
     def transcribe(self, audio: np.ndarray, sample_rate: int) -> Transcript:
+        ...
+
+
+class SpeakerDiarizer(Protocol):
+    """Return a source-aligned speaker timeline for one complete recording."""
+
+    def diarize(
+        self,
+        audio: np.ndarray,
+        sample_rate: int,
+        regions: Sequence[SpeechRegion],
+    ) -> Sequence[SpeakerInterval]:
         ...

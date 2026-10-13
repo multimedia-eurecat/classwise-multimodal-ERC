@@ -1,0 +1,10 @@
+The vendored module aimara/rob/_voice_identity.py is copied without functional
+changes from Eurecat/EutSpeechAudioProcessing:
+
+  speech_recognition/speech_recognition/voice_identity_manager.py
+  commit fd89b8b537c17b7ccd103310039ddcf6faf7aa4e
+  https://github.com/Eurecat/EutSpeechAudioProcessing
+
+It is distributed under the upstream Apache License 2.0. See
+EutSpeechAudioProcessing.LICENSE in this directory. Aimara uses the session-only
+matcher; its optional MongoDB and fleet synchronization paths are not activated.

@@ -30,7 +30,7 @@ python -m pip install faster-whisper==1.2.1
 ```
 
 Model loading is explicit so importing `aimara` does not initialize or download
-either model:
+speech models:
 
 ```python
 from aimara.rob import ROBTranscriber, ROBVoiceActivityDetector
@@ -63,8 +63,50 @@ segments = processor.process_video(
 )
 ```
 
-Speaker IDs are currently set to `UNKNOWN` because diarization is intentionally
-outside this integration's scope.
+Without a diarizer, speaker IDs default to `UNKNOWN`. Optional offline
+ReDimNet2 diarization assigns session-local `speaker1`, `speaker2`, etc.:
+
+```python
+from aimara.rob import ROBSpeakerDiarizer
+
+diarizer = ROBSpeakerDiarizer.from_torch_hub(
+    weights_dir="/path/to/diarization-weights",
+    device="cpu",
+)
+processor = OfflineROBProcessor(
+    vad_processor=OfflineVADProcessor(vad, config),
+    transcriber=asr,
+    diarizer=diarizer,
+)
+```
+
+The adapter loads the new ROB repository's pinned ReDimNet2 `b6/lm` checkpoint
+trained on `vb2+vox2+cnc2_v0`. It uses the vendored ROB voice identity matcher
+with its upstream license and provenance under `aimara/rob/third_party/`;
+neither ROS nor MongoDB is required. The model stays loaded across batch videos,
+while the identity gallery resets for each recording. IDs are therefore local
+to each video rather than persistent person identities.
+
+ReDimNet2's [pinned requirements](https://github.com/PalabraAI/redimnet2/blob/c5bbe0b76e37df698c403f8844e41304ceab6307/requirements.txt)
+are PyTorch, Torchaudio, NumPy, and SciPy. They are already present in
+`aimara_env`; this adapter does not require NeMo or the ROS speech stack's
+complete requirements. The explicit loader downloads the model on first use.
+
+This first adapter labels existing VAD regions using up to their latest two
+seconds of audio. It does not split a region when the speaker changes inside
+it. Regions under 0.8 seconds are left `UNKNOWN`; unmatched regions need at
+least 1.5 seconds to establish a voice. An earlier short region can match a
+voice established later in the same recording, but unresolved or ambiguous
+regions remain `UNKNOWN`. Speaker intervals use exact source sample offsets.
+
+For either `aimara.run_pipeline` or `aimara.run_batch`, append:
+
+```bash
+--diarization-backend redimnet2 --diarization-weights /tmp/aimara-redimnet2
+```
+
+The default backend is `none`. Use a fresh output directory when switching
+diarization on: batch `--resume` does not check the speech configuration.
 
 ## ERC feature bridge
 
@@ -93,8 +135,12 @@ outputs = model(**model_inputs)
 ```
 
 Text context is causal and never includes reference sentiment or emotion
-labels. Until diarization is added, all `UNKNOWN` speakers map to speaker slot
-zero. The selected checkpoint must have the same text, audio, visual, and
+labels. Known speaker IDs map to stable conversation-local slots; `UNKNOWN`
+maps to slot zero and reserves that slot. The current two-speaker checkpoint
+therefore accepts two known voices, or one known voice plus `UNKNOWN`; more
+distinct labels raise an explicit error. Handling unknown turns alongside two
+known voices and splitting regions at speaker changes are subsequent integration
+steps. The selected checkpoint must have the same text, audio, visual, and
 speaker dimensions as the loaded encoders.
 
 Run the complete ROB VAD/ASR to IEMOCAP ERC pipeline with:
