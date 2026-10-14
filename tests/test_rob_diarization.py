@@ -41,7 +41,8 @@ class ROBSpeakerDiarizerTests(unittest.TestCase):
             [(s.start_sample, s.end_sample) for s in timeline],
             [(r.start_sample, r.end_sample) for r in regions],
         )
-        self.assertEqual(timeline[0].confidence, -1.0)
+        # Scores now measure probe matches against the established gallery.
+        self.assertAlmostEqual(timeline[0].confidence, 1.0)
         self.assertAlmostEqual(timeline[2].confidence, 1.0)
 
     def test_short_turn_can_match_a_voice_established_later_without_new_identity(self):
@@ -70,16 +71,21 @@ class ROBSpeakerDiarizerTests(unittest.TestCase):
         timeline = diarizer.diarize(second, SAMPLE_RATE, second_regions)
         self.assertEqual(timeline[0].speaker_id, "speaker1")
 
-    def test_embedding_is_bounded_to_the_latest_two_seconds(self):
+    def test_all_gallery_and_probe_embeddings_are_bounded_to_two_seconds(self):
         embedder = Mock(side_effect=speaker_embedding)
         audio, regions = recording([(1, 5)])
         ROBSpeakerDiarizer(embedder=embedder).diarize(audio, SAMPLE_RATE, regions)
-        np.testing.assert_array_equal(embedder.call_args.args[0], audio[-32000:])
+        lengths = [len(call.args[0]) for call in embedder.call_args_list]
+        self.assertLessEqual(max(lengths), 32000)
+        self.assertGreaterEqual(min(lengths), 12800)
 
     def test_ambiguous_match_does_not_invent_a_third_speaker(self):
-        embeddings = iter([np.array([1, 0]), np.array([0, 1]), np.array([1, 1])])
-        audio, regions = recording([(1, 2), (2, 2), (1, 2)])
-        timeline = ROBSpeakerDiarizer(embedder=lambda audio: next(embeddings)).diarize(
+        audio, regions = recording([(1, 2), (2, 2), (3, 2)])
+
+        def embedding(samples):
+            return np.array({1: [1, 0], 2: [0, 1], 3: [1, 1]}[int(samples[0])])
+
+        timeline = ROBSpeakerDiarizer(embedder=embedding).diarize(
             audio, SAMPLE_RATE, regions
         )
         self.assertEqual(
@@ -151,8 +157,96 @@ class ROBSpeakerDiarizerTests(unittest.TestCase):
             trust_repo=True,
         )
         set_dir.assert_called_once_with(directory)
-        self.assertEqual(seen, [((1, 32000), torch.float32, "cpu")])
+        self.assertIn(((1, 32000), torch.float32, "cpu"), seen)
+        self.assertTrue(
+            all(
+                shape[0] == 1
+                and shape[1] <= 32000
+                and dtype == torch.float32
+                and device == "cpu"
+                for shape, dtype, device in seen
+            )
+        )
         self.assertEqual(result[0].speaker_id, "speaker1")
+
+    def test_detects_a_b_a_without_a_vad_pause(self):
+        audio, _ = recording([(1, 2), (2, 2), (1, 2)])
+
+        def embedding(samples):
+            return np.array(
+                [np.count_nonzero(samples == 1), np.count_nonzero(samples == 2)],
+                dtype=np.float32,
+            )
+
+        timeline = ROBSpeakerDiarizer(embedder=embedding).diarize(
+            audio, SAMPLE_RATE, [SpeechRegion(0, len(audio))]
+        )
+        self.assertEqual(
+            [(s.start_sample, s.end_sample, s.speaker_id) for s in timeline],
+            [
+                (0, 32000, "speaker1"),
+                (32000, 64000, "speaker2"),
+                (64000, 96000, "speaker1"),
+            ],
+        )
+
+    def test_overlapping_gallery_windows_and_probes_do_not_double_count_learning(self):
+        from aimara.rob._voice_identity import VoiceIdentityManager
+
+        managers = []
+
+        def make_manager(**kwargs):
+            manager = VoiceIdentityManager(**kwargs)
+            managers.append(manager)
+            return manager
+
+        audio, regions = recording([(1, 9)])
+        with patch(
+            "aimara.rob._voice_identity.VoiceIdentityManager", side_effect=make_manager
+        ):
+            ROBSpeakerDiarizer(embedder=speaker_embedding).diarize(
+                audio, SAMPLE_RATE, regions
+            )
+        identities = list(managers[0].identities.values())
+        self.assertEqual(len(identities), 1)
+        self.assertGreater(len(identities[0].all_embeddings), 1)
+        self.assertLessEqual(
+            identities[0].clean_speech_seconds, len(audio) / SAMPLE_RATE
+        )
+
+    def test_changes_use_source_offsets_and_never_bridge_a_vad_gap(self):
+        audio = np.zeros(112000, dtype=np.float32)
+        audio[8000:40000] = 1
+        audio[40000:72000] = 2
+        audio[80000:112000] = 1
+
+        def embedding(samples):
+            return np.array(
+                [np.count_nonzero(samples == 1), np.count_nonzero(samples == 2)],
+                dtype=np.float32,
+            )
+
+        timeline = ROBSpeakerDiarizer(embedder=embedding).diarize(
+            audio, SAMPLE_RATE, [SpeechRegion(8000, 72000), SpeechRegion(80000, 112000)]
+        )
+        self.assertEqual(
+            [(s.start_sample, s.end_sample) for s in timeline],
+            [(8000, 40000), (40000, 72000), (80000, 112000)],
+        )
+
+    def test_unlike_end_probes_cannot_seed_an_identity_from_a_mixed_window(self):
+        audio, _ = recording([(1, 1), (2, 1)])
+
+        def embedding(samples):
+            return np.array(
+                [np.count_nonzero(samples == 1), np.count_nonzero(samples == 2)],
+                dtype=np.float32,
+            )
+
+        timeline = ROBSpeakerDiarizer(embedder=embedding).diarize(
+            audio, SAMPLE_RATE, [SpeechRegion(0, len(audio))]
+        )
+        self.assertEqual([s.speaker_id for s in timeline], ["UNKNOWN"])
 
 
 if __name__ == "__main__":

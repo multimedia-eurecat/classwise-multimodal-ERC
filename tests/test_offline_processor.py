@@ -10,6 +10,8 @@ from aimara import (
     SpeakerInterval,
     SpeechRegion,
     Transcript,
+    TranscriptSegment,
+    TranscriptWord,
 )
 
 
@@ -35,6 +37,67 @@ class FakeTranscriber:
 
 
 class OfflineROBProcessorTests(unittest.TestCase):
+    def test_segment_ids_remain_unique_across_splits_and_later_vad_regions(self):
+        from unittest.mock import Mock
+
+        words = (TranscriptWord(0, 0.8, " First."), TranscriptWord(1.2, 2, " Second."))
+        diarizer = Mock()
+        diarizer.diarize.return_value = [
+            SpeakerInterval(0, 16000, "A"),
+            SpeakerInterval(16000, 32000, "B"),
+            SpeakerInterval(40000, 56000, "A"),
+        ]
+        transcriber = FakeTranscriber(
+            [
+                Transcript(
+                    "First. Second.",
+                    "en",
+                    (TranscriptSegment(0, 2, "First. Second.", words),),
+                ),
+                Transcript("Third.", "en"),
+            ]
+        )
+        processor = OfflineROBProcessor(
+            vad_processor=FakeVADProcessor(
+                [SpeechRegion(0, 32000), SpeechRegion(40000, 56000)]
+            ),
+            transcriber=transcriber,
+            diarizer=diarizer,
+            audio_decoder=lambda path, sample_rate: np.zeros(56000, dtype=np.float32),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            segments = processor.process_video("video.mp4", directory)
+        self.assertEqual([s.segment_id for s in segments], [0, 1, 2])
+        self.assertEqual(
+            [s.audio_path.name for s in segments],
+            ["segment_0000.wav", "segment_0001.wav", "segment_0002.wav"],
+        )
+        self.assertEqual(
+            [(s.start_time, s.end_time) for s in segments], [(0, 1), (1, 2), (2.5, 3.5)]
+        )
+        self.assertEqual(len(transcriber.calls), 2)
+
+    def test_timed_transcript_without_diarization_keeps_the_original_region(self):
+        words = (TranscriptWord(0, 0.8, " First."), TranscriptWord(1.2, 2, " Second."))
+        processor = OfflineROBProcessor(
+            vad_processor=FakeVADProcessor([SpeechRegion(0, 32000)]),
+            transcriber=FakeTranscriber(
+                [
+                    Transcript(
+                        "First. Second.",
+                        "en",
+                        (TranscriptSegment(0, 2, "First. Second.", words),),
+                    )
+                ]
+            ),
+            audio_decoder=lambda path, sample_rate: np.zeros(32000, dtype=np.float32),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            segments = processor.process_video("video.mp4", directory)
+        self.assertEqual(len(segments), 1)
+        self.assertEqual(segments[0].transcript, "First. Second.")
+        self.assertEqual(segments[0].duration, 2)
+
     def test_uses_diarization_timeline_without_changing_audio_or_transcript_boundaries(
         self,
     ):

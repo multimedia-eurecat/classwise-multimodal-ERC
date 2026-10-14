@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable, List, Optional, Union
 
 from .audio_io import decode_audio, write_wav
-from .diarization import speaker_for_region
 from .domain import SpeechSegment
+from .speaker_segmentation import SpeakerSegmenter, SpeakerUtterance
 from .speech_interfaces import SpeakerDiarizer, Transcriber
 from .vad_processing import OfflineVADProcessor
 
@@ -24,6 +24,7 @@ class OfflineROBProcessor:
         vad_processor: OfflineVADProcessor,
         transcriber: Transcriber,
         diarizer: Optional[SpeakerDiarizer] = None,
+        speaker_segmenter: Optional[SpeakerSegmenter] = None,
         speaker_id: str = "UNKNOWN",
         audio_decoder: Callable[..., "np.ndarray"] = decode_audio,
         wav_writer: Callable[..., Path] = write_wav,
@@ -33,6 +34,7 @@ class OfflineROBProcessor:
         self.vad_processor = vad_processor
         self.transcriber = transcriber
         self.diarizer = diarizer
+        self.speaker_segmenter = speaker_segmenter or SpeakerSegmenter()
         self.speaker_id = speaker_id
         self._audio_decoder = audio_decoder
         self._wav_writer = wav_writer
@@ -72,28 +74,35 @@ class OfflineROBProcessor:
         audio_dir.mkdir(parents=True, exist_ok=True)
         segments: List[SpeechSegment] = []
 
-        for segment_id, region in enumerate(regions):
+        for region in regions:
             segment_audio = audio[region.start_sample : region.end_sample].copy()
             transcript = self.transcriber.transcribe(segment_audio, sample_rate)
-            audio_path = audio_dir / f"segment_{segment_id:04d}.wav"
-            self._wav_writer(audio_path, segment_audio, sample_rate=sample_rate)
-
-            segments.append(
-                SpeechSegment(
-                    conversation_id=selected_conversation_id,
-                    segment_id=segment_id,
-                    source_video=source_video,
-                    audio_path=audio_path,
-                    start_time=region.start_time(sample_rate),
-                    end_time=region.end_time(sample_rate),
-                    speaker_id=(
-                        self.speaker_id
-                        if self.diarizer is None
-                        else speaker_for_region(region, timeline)
-                    ),
-                    transcript=transcript.text,
-                    language=transcript.language,
-                )
+            utterances = (
+                self.speaker_segmenter.split(region, transcript, sample_rate, timeline)
+                if self.diarizer is not None
+                else [SpeakerUtterance(region, self.speaker_id, transcript.text)]
             )
+            for utterance in utterances:
+                segment_id = len(segments)
+                speech_region = utterance.region
+                audio_path = audio_dir / f"segment_{segment_id:04d}.wav"
+                self._wav_writer(
+                    audio_path,
+                    audio[speech_region.start_sample : speech_region.end_sample].copy(),
+                    sample_rate=sample_rate,
+                )
+                segments.append(
+                    SpeechSegment(
+                        conversation_id=selected_conversation_id,
+                        segment_id=segment_id,
+                        source_video=source_video,
+                        audio_path=audio_path,
+                        start_time=speech_region.start_time(sample_rate),
+                        end_time=speech_region.end_time(sample_rate),
+                        speaker_id=utterance.speaker_id,
+                        transcript=utterance.text,
+                        language=transcript.language,
+                    )
+                )
 
         return segments

@@ -15,11 +15,10 @@ if TYPE_CHECKING:
 
 
 class ROBSpeakerDiarizer:
-    """Embed VAD regions and resolve session-local identities using ROB's matcher.
+    """Resolve session-local voices and probe speaker changes within VAD regions.
 
-    Each recording has its own identity manager. This first offline adapter
-    labels existing regions; speaker changes inside a region require subsequent
-    word-timed segmentation rather than changing the region's boundaries here.
+    Stable long windows establish the gallery; short centred probes label the
+    source timeline without learning from windows across a speaker change.
     """
 
     DEFAULT_REPOSITORY = "PalabraAI/redimnet2:c5bbe0b76e37df698c403f8844e41304ceab6307"
@@ -34,6 +33,9 @@ class ROBSpeakerDiarizer:
         min_embed_duration: float = 0.8,
         min_create_duration: float = 1.5,
         max_embed_duration: float = 2.0,
+        probe_duration: float = 1.0,
+        step_duration: float = 0.5,
+        change_threshold: float = 0.35,
         logger: Optional[logging.Logger] = None,
     ) -> None:
         if (
@@ -55,6 +57,22 @@ class ROBSpeakerDiarizer:
         self.min_embed_duration = min_embed_duration
         self.min_create_duration = min_create_duration
         self.max_embed_duration = max_embed_duration
+        if (
+            not math.isfinite(probe_duration)
+            or not min_embed_duration <= probe_duration <= max_embed_duration
+        ):
+            raise ValueError(
+                "probe_duration must be between minimum and maximum embedding duration"
+            )
+        if not math.isfinite(step_duration) or not 0 < step_duration <= probe_duration:
+            raise ValueError(
+                "step_duration must be positive and no larger than probe_duration"
+            )
+        if not math.isfinite(change_threshold) or not 0 <= change_threshold <= 1:
+            raise ValueError("change_threshold must be between 0 and 1")
+        self.probe_duration = probe_duration
+        self.step_duration = step_duration
+        self.change_threshold = change_threshold
         self._logger = logger or logging.getLogger(__name__)
 
     @classmethod
@@ -112,7 +130,7 @@ class ROBSpeakerDiarizer:
         sample_rate: int,
         regions: Sequence[SpeechRegion],
     ) -> list[SpeakerInterval]:
-        """Label each existing region; short unmatched audio remains UNKNOWN."""
+        """Build a non-overlapping source timeline, including mid-region changes."""
         import numpy as np
 
         from ._voice_identity import VoiceIdentityManager, normalize_embedding
@@ -142,63 +160,140 @@ class ROBSpeakerDiarizer:
             # Offline compute time must not expire a voice in a long recording.
             identity_timeout=float("inf"),
         )
-        observations = []
+        cache = {}
         embedding_size = None
-        for index, region in enumerate(ordered):
-            track = f"region{index}"
-            seconds = min(
-                region.duration_samples / sample_rate, self.max_embed_duration
-            )
-            embedding = None
-            result = None
-            if seconds >= self.min_embed_duration:
-                start = max(
-                    region.start_sample,
-                    region.end_sample - round(self.max_embed_duration * sample_rate),
-                )
-                window = np.ascontiguousarray(audio[start : region.end_sample])
-                # Digital silence cannot establish or update an identity.
-                if np.any(window):
-                    embedding = normalize_embedding(self._embedder(window))
-                    if embedding_size is not None and embedding.size != embedding_size:
+
+        def embed(start: int, end: int):
+            nonlocal embedding_size
+            key = (start, end)
+            if key not in cache:
+                window = np.ascontiguousarray(audio[start:end])
+                vector = None
+                if len(window) / sample_rate >= self.min_embed_duration and np.any(
+                    window
+                ):
+                    vector = normalize_embedding(self._embedder(window))
+                    if embedding_size is not None and vector.size != embedding_size:
                         raise ValueError(
                             "speaker embedding dimension changed within a recording"
                         )
-                    embedding_size = embedding.size
-                    result = manager.process_new_embedding_batch(
-                        {track: embedding},
-                        speech_seconds=seconds,
-                        learn=True,
-                        allow_create=seconds >= self.min_create_duration,
-                        allow_create_when_ambiguous=False,
-                    ).get(track)
-            observations.append((region, track, embedding, seconds, result))
+                    embedding_size = vector.size
+                cache[key] = vector
+            return cache[key]
 
-        # Offline attribution can resolve an earlier short turn once a later
-        # region has established that voice. This pass never creates or learns.
-        resolved = []
-        for region, track, embedding, seconds, result in observations:
-            if result is None and embedding is not None:
+        step = max(1, round(self.step_duration * sample_rate))
+        minimum = math.ceil(self.min_embed_duration * sample_rate)
+        maximum = round(self.max_embed_duration * sample_rate)
+        learned_until = {}
+        for region in ordered:
+            length = min(maximum, region.duration_samples)
+            if length / sample_rate < self.min_create_duration:
+                continue
+            last_start = region.end_sample - length
+            starts = list(range(region.start_sample, last_start + 1, step))
+            if starts[-1] != last_start:
+                starts.append(last_start)
+            for start in starts:
+                end = start + length
+                # An embedding spanning unlike voices must not seed or train a
+                # speaker. ROB's change score is applied to the two end probes.
+                head, tail = embed(start, start + minimum), embed(end - minimum, end)
+                if (
+                    head is None
+                    or tail is None
+                    or float(head @ tail) < self.change_threshold
+                ):
+                    continue
+                vector = embed(start, end)
+                if vector is None:
+                    continue
+                track = f"gallery:{start}:{end}"
+                known = set(manager.identities)
                 result = manager.process_new_embedding_batch(
-                    {track: embedding},
-                    speech_seconds=seconds,
+                    {track: vector},
+                    speech_seconds=length / sample_rate,
                     learn=False,
-                    allow_create=False,
+                    allow_create=True,
+                    allow_create_when_ambiguous=False,
                 ).get(track)
-            resolved.append((region, track, result))
+                if result is None:
+                    continue
+                speaker = result[0]
+                last_learning = max(
+                    (
+                        until
+                        for prior_track, until in learned_until.items()
+                        if manager.track_to_identity.get(prior_track) == speaker
+                    ),
+                    default=0,
+                )
+                if speaker not in known:
+                    learned_until[track] = end
+                elif start >= last_learning:
+                    # Overlapping windows must not count the same speech twice
+                    # towards confirmation or repeatedly move the gallery mean.
+                    manager.process_new_embedding_batch(
+                        {track: vector},
+                        speech_seconds=length / sample_rate,
+                        learn=True,
+                        allow_create=False,
+                    )
+                    learned_until[track] = end
+
+        # Resolve probes after the gallery is established, so an early short
+        # turn can use a voice learned later in the recording. Probes never learn.
+        records = []
+        for region_index, region in enumerate(ordered):
+            width = min(
+                round(self.probe_duration * sample_rate), region.duration_samples
+            )
+            for start in range(region.start_sample, region.end_sample, step):
+                end = min(start + step, region.end_sample)
+                middle = (start + end) // 2
+                probe_start = max(
+                    region.start_sample,
+                    min(middle - width // 2, region.end_sample - width),
+                )
+                vector = embed(probe_start, probe_start + width)
+                track = f"probe:{region_index}:{start}"
+                result = (
+                    None
+                    if vector is None
+                    else manager.process_new_embedding_batch(
+                        {track: vector},
+                        speech_seconds=width / sample_rate,
+                        learn=False,
+                        allow_create=False,
+                    ).get(track)
+                )
+                records.append((region_index, start, end, track, result))
 
         timeline = []
-        for region, track, result in resolved:
-            speaker = manager.track_to_identity.get(track, "UNKNOWN")
+        previous_region = None
+        for region_index, start, end, track, result in records:
+            speaker = manager.track_to_identity.get(track, "UNKNOWN").removeprefix(
+                "EUT_"
+            )
             confidence = (
                 -1.0 if result is None or result[1] < 0 else min(1.0, float(result[1]))
             )
-            timeline.append(
-                SpeakerInterval(
-                    region.start_sample,
-                    region.end_sample,
-                    speaker.removeprefix("EUT_"),
-                    confidence,
+            if (
+                timeline
+                and region_index == previous_region
+                and timeline[-1].speaker_id == speaker
+            ):
+                previous = timeline.pop()
+                total = end - previous.start_sample
+                confidence = (
+                    (
+                        previous.confidence * previous.duration_samples
+                        + confidence * (end - start)
+                    )
+                    / total
+                    if confidence >= 0 and previous.confidence >= 0
+                    else -1.0
                 )
-            )
+                start = previous.start_sample
+            timeline.append(SpeakerInterval(start, end, speaker, confidence))
+            previous_region = region_index
         return timeline

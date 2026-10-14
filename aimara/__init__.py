@@ -7,6 +7,11 @@ from .erc_features import ConversationFeatures, ERCFeatureBridge, SegmentFeature
 from .erc_model import ERCEmotionModel, ERCModelProfile, EmotionPrediction
 from .offline_processor import OfflineROBProcessor
 from .segmentation import SpeechRegion, VADSegmenter
+from .speaker_segmentation import (
+    SpeakerSegmentationConfig,
+    SpeakerSegmenter,
+    SpeakerUtterance,
+)
 from .speech_interfaces import (
     ROBProcessorConfig,
     SpeakerDiarizer,
@@ -32,6 +37,9 @@ __all__ = [
     "SpeechSegment",
     "SpeakerDiarizer",
     "SpeakerInterval",
+    "SpeakerSegmentationConfig",
+    "SpeakerSegmenter",
+    "SpeakerUtterance",
     "SegmentFeatureEncoder",
     "Transcript",
     "TranscriptSegment",

@@ -61,11 +61,12 @@ for word in transcript.words:
 
 Segment boundaries are retained even when a backend returns no word timings.
 `Transcript(text, language)` remains valid for text-only adapters and test doubles.
-The offline processor currently uses the joined text; splitting VAD regions using
-word timings and the speaker timeline is the next integration step.
+With diarization enabled, the offline processor groups these timings by speaker
+and produces separate ERC inputs for speaker changes within a VAD region.
 
-The models are composed by the offline processor, which writes one WAV and
-returns one `SpeechSegment` per VAD region:
+The models are composed by the offline processor, which writes a WAV for each
+returned `SpeechSegment`. With diarization disabled it returns one segment per
+VAD region; with diarization enabled a region can yield several speaker groups:
 
 ```python
 from aimara import OfflineROBProcessor, OfflineVADProcessor, ROBProcessorConfig
@@ -110,12 +111,18 @@ are PyTorch, Torchaudio, NumPy, and SciPy. They are already present in
 `aimara_env`; this adapter does not require NeMo or the ROS speech stack's
 complete requirements. The explicit loader downloads the model on first use.
 
-This first adapter labels existing VAD regions using up to their latest two
-seconds of audio. It does not split a region when the speaker changes inside
-it. Regions under 0.8 seconds are left `UNKNOWN`; unmatched regions need at
-least 1.5 seconds to establish a voice. An earlier short region can match a
-voice established later in the same recording, but unresolved or ambiguous
-regions remain `UNKNOWN`. Speaker intervals use exact source sample offsets.
+The adapter establishes voices from windows up to two seconds long, sliding at
+0.5-second intervals. Windows whose two end probes sound unlike each other do
+not seed or train a voice. Repeated overlapping windows are matched without
+repeatedly training an already learned identity. It then matches one-second centred probes to the gallery
+to label the timeline at 0.5-second resolution, including changes within a
+continuous VAD region. This is an offline approximation of speaker boundaries,
+not separation of simultaneous voices.
+
+Regions under 0.8 seconds remain `UNKNOWN`; unmatched windows need at least
+1.5 seconds to establish a voice. Short earlier regions can match a voice learned
+later in the same recording. Unresolved or ambiguous probes remain `UNKNOWN`.
+Speaker intervals are represented by exact source sample offsets.
 
 For either `aimara.run_pipeline` or `aimara.run_batch`, append:
 
@@ -125,6 +132,36 @@ For either `aimara.run_pipeline` or `aimara.run_batch`, append:
 
 The default backend is `none`. Use a fresh output directory when switching
 diarization on: batch `--resume` does not check the speech configuration.
+
+With diarization enabled, timed words are assigned to speakers by their overlap
+with that timeline. By default, whole sentences are labelled with their majority
+speaker, or a credible trailing speaker change (at least two words and 0.4 seconds),
+matching ROB's sentence grouping policy. Consecutive sentences assigned to the
+same speaker are merged. A backend segment without complete word alignment stays
+intact; text-only transcripts retain their original VAD region.
+
+For raw word runs with short speaker fluctuations smoothed into the preceding
+run, inject a segmenter into `OfflineROBProcessor`:
+
+```python
+from aimara import SpeakerSegmentationConfig, SpeakerSegmenter
+
+segmenter = SpeakerSegmenter(
+    SpeakerSegmentationConfig(snap_splits_to_sentences=False)
+)
+processor = OfflineROBProcessor(
+    vad_processor=OfflineVADProcessor(vad, config),
+    transcriber=asr,
+    diarizer=diarizer,
+    speaker_segmenter=segmenter,
+)
+```
+
+Each group receives its own WAV and corresponding source-video times. Cuts fall
+midway between adjacent groups' word boundaries; leading and trailing VAD audio
+stay with the outer groups. The WAVs partition the VAD region without duplicated
+or discarded samples, even when estimated word times overlap. ASR still runs once
+per VAD region, and segment IDs are unique across the whole recording.
 
 ## ERC feature bridge
 
@@ -157,8 +194,8 @@ labels. Known speaker IDs map to stable conversation-local slots; `UNKNOWN`
 maps to slot zero and reserves that slot. The current two-speaker checkpoint
 therefore accepts two known voices, or one known voice plus `UNKNOWN`; more
 distinct labels raise an explicit error. Handling unknown turns alongside two
-known voices and splitting regions at speaker changes are subsequent integration
-steps. The selected checkpoint must have the same text, audio, visual, and
+known voices remains a subsequent integration step. The selected checkpoint must
+have the same text, audio, visual, and
 speaker dimensions as the loaded encoders.
 
 Run the complete ROB VAD/ASR to IEMOCAP ERC pipeline with:

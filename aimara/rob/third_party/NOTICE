@@ -8,3 +8,7 @@ changes from Eurecat/EutSpeechAudioProcessing:
 It is distributed under the upstream Apache License 2.0. See
 EutSpeechAudioProcessing.LICENSE in this directory. Aimara uses the session-only
 matcher; its optional MongoDB and fleet synchronization paths are not activated.
+
+Sentence grouping and short-run smoothing in aimara/speaker_segmentation.py are
+adapted from ASREngine in the same upstream commit:
+  speech_recognition/speech_recognition/asr_engine.py
