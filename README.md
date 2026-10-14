@@ -61,6 +61,10 @@ profiles, matching CPU/CUDA Torch packages, and an environment checker. See
 [isolated runtime setup](aimara/README.md#isolated-runtime-environments) for
 fresh installations; the validated CPU profiles run without the shared
 environment's OpenCV workaround.
+Run `python -m aimara.run_acceptance --report /tmp/aimara-acceptance-report.json`
+from the repository root for the regression and generated-media acceptance suite.
+The [acceptance guide](aimara/README.md#acceptance-validation-step-12a) describes
+its fixtures, reports and completion criteria.
 
 ### Current validation status
 
@@ -68,7 +72,7 @@ environment's OpenCV workaround.
 - A batch run processed all 10 clean `selfie-videos` without pipeline failures.
 - Per-video and combined JSON/CSV outputs preserve VAD timing, transcripts,
   emotion predictions, confidence values, and class probabilities.
-- The automated suite currently contains 54 passing tests covering contracts,
+- The automated suite currently contains 195 passing tests covering contracts,
   VAD/ASR adapters, segmentation, feature alignment, checkpoint validation,
   orchestration, failure handling, and resume behavior.
 
@@ -79,8 +83,9 @@ directly predict synthetic labels such as `fear`, `disgust`, or `surprise`.
 
 ### Known limitations
 
-- Diarization is not integrated; runtime segments currently use speaker ID
-  `UNKNOWN`, mapped consistently to speaker slot zero.
+- Optional ReDimNet2 diarization is integrated; pretrained attribution accuracy
+  and runtime still need evaluation. Unresolved turns retain `UNKNOWN` and omit
+  speaker embeddings by default.
 - Processing is offline and video-oriented. ROB integration will require a thin
   in-memory or ROS-facing adapter around finalized speech segments.
 - VAD regions can contain more than one conversational turn when pauses are

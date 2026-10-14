@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "sample_rate": 16000,
+  "fps": 10,
+  "cases": [
+    {
+      "id": "silence",
+      "audio_blocks": [[16384, 0.0]],
+      "diarization": false,
+      "regions": [],
+      "segments": []
+    },
+    {
+      "id": "speech_at_boundaries",
+      "audio_blocks": [[8192, 0.25], [4096, 0.0], [8000, 0.5]],
+      "diarization": false,
+      "regions": [[0, 8192], [12288, 20288]],
+      "segments": [[0, 8192, "UNKNOWN", "Voice A."], [12288, 20288, "UNKNOWN", "Voice unresolved."]]
+    },
+    {
+      "id": "long_speech",
+      "audio_blocks": [[513024, 0.25]],
+      "diarization": false,
+      "regions": [[0, 480000], [480000, 513024]],
+      "segments": [[0, 480000, "UNKNOWN", "Voice A."], [480000, 513024, "UNKNOWN", "Voice A."]]
+    },
+    {
+      "id": "speaker_returns",
+      "audio_blocks": [[16384, 0.25], [16384, 0.75], [16384, 0.25]],
+      "diarization": true,
+      "regions": [[0, 49152]],
+      "segments": [[0, 16384, "A", "Voice A."], [16384, 32768, "B", "Voice B."], [32768, 49152, "A", "Voice A."]]
+    },
+    {
+      "id": "two_known_plus_unknown",
+      "audio_blocks": [[16384, 0.25], [16384, 0.75], [16384, 0.5]],
+      "diarization": true,
+      "regions": [[0, 49152]],
+      "segments": [[0, 16384, "A", "Voice A."], [16384, 32768, "B", "Voice B."], [32768, 49152, "UNKNOWN", "Voice unresolved."]]
+    },
+    {
+      "id": "missing_faces",
+      "audio_blocks": [[16384, 0.25]],
+      "diarization": false,
+      "fullframe_fallback": false,
+      "regions": [[0, 16384]],
+      "segments": [[0, 16384, "UNKNOWN", "Voice A."]]
+    },
+    {
+      "id": "speaker_capacity",
+      "audio_blocks": [[16384, 0.25], [16384, 0.75], [16384, 0.875]],
+      "diarization": true,
+      "regions": [[0, 49152]],
+      "error": "checkpoint supports 2"
+    }
+  ]
+}

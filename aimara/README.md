@@ -625,6 +625,57 @@ For a custom Python pipeline, supply `AIMARAPipeline(..., resume_config=...)` or
 Use `Path` values for model artifacts to include their identities. Without a
 configuration, batch processing still works but resume reruns cached videos.
 
+## Acceptance validation: step 12A
+
+Activate an isolated runtime environment from the setup section, then run from
+the repository root:
+
+```bash
+python -m aimara.run_acceptance --report /tmp/aimara-acceptance-report.json
+```
+
+Add `--verbose` to print every test name. The command runs the full existing
+regression suite plus the generated-media acceptance cases. FFmpeg and FFprobe
+are required. Exit codes are `0` for a complete pass, `1` for a failed or
+incomplete suite (including skips/expected failures), and `2` for missing media
+executables. An empty suite also fails. Ordinary `unittest` discovery remains
+available, but the acceptance runner enforces the stricter completion gate.
+
+The report records the fixture-manifest SHA-256, Python/platform/package versions,
+individual test names, statuses, timings and failure details, along with totals.
+Failed subtests mark their parent test as failed. Reports are written atomically;
+fixtures, generated media, and tiny checkpoint files are created in temporary
+directories and cleaned up after the run. Intentional failure/recovery tests
+produce error logs; the final acceptance status and report identify their outcome.
+
+The fixed [fixture manifest](../tests/fixtures/acceptance_cases.json) defines:
+
+| Case | Required behavior |
+|---|---|
+| Silence | Empty predictions; ASR and feature extraction are skipped |
+| Speech at source boundaries | Speech at time zero and the partial final audio chunk survives without added source samples |
+| Speech longer than 30 seconds | VAD splits conserve every source speech sample |
+| Speaker A → B → A | Turn order, speaker identity and aligned clips survive through ERC and JSON |
+| Two known speakers plus UNKNOWN | All turns reach ERC; UNKNOWN has a zero speaker-mask row |
+| Missing faces | Speech remains; the visual feature is zero with full-frame fallback disabled |
+| Excess known speakers | A two-speaker checkpoint rejects three known identities without writing emotion results |
+| Batch recovery and resume | Invalid media/capacity failures are recorded, later videos run, repaired inputs recover, matching caches are reused, and changed configurations rerun |
+
+These cases use lossless PCM markers and numbered video frames. Controlled
+doubles supply VAD probabilities, ASR words, speaker attribution and unimodal
+neural embeddings. The real FFmpeg decoder, VAD state machine, speaker grouping,
+WAV writer, text/audio/visual adapters, feature bridge, checkpoint loader, ERC
+transformer, pipeline and batch writer execute. Assertions check source PCM,
+source-frame windows, ASR-input intervals, chronological context, finite normalized
+six-class probabilities and matching JSON/CSV exports. The tiny ERC checkpoint
+is seeded and untrained; its output labels serve contract validation.
+
+Step 12B covers pretrained-model smoke runs, including ReDimNet2 and
+Parakeet/AmberNet weights and available CUDA hardware. Step 12C covers reference
+accuracy, configuration comparisons, latency and memory measurements. Passing
+12A establishes the deterministic integration contracts; those model-quality
+and deployment checks remain separate validation stages.
+
 The output root contains combined `predictions.csv`, `predictions.json`, and
 `failures.json` files. Each video also receives its own directory containing
 segment WAVs and its individual `predictions.json`. A failure is recorded and
