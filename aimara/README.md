@@ -141,7 +141,15 @@ same speaker are merged. A backend segment without complete word alignment stays
 intact; text-only transcripts retain their original VAD region.
 
 For raw word runs with short speaker fluctuations smoothed into the preceding
-run, inject a segmenter into `OfflineROBProcessor`:
+run, append these options to either runner's command:
+
+```bash
+--no-snap-splits-to-sentences \
+--min-speaker-run-tokens 2 \
+--min-speaker-run-duration 0.4
+```
+
+The same policy can be injected into `OfflineROBProcessor`:
 
 ```python
 from aimara import SpeakerSegmentationConfig, SpeakerSegmenter
@@ -162,6 +170,41 @@ midway between adjacent groups' word boundaries; leading and trailing VAD audio
 stay with the outer groups. The WAVs partition the VAD region without duplicated
 or discarded samples, even when estimated word times overlap. ASR still runs once
 per VAD region, and segment IDs are unique across the whole recording.
+
+Both `aimara.run_pipeline` and `aimara.run_batch` expose the offline segmentation
+settings below. Omitting the options keeps Aimara's existing defaults:
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `--vad-threshold` | `0.5` | Minimum VAD probability treated as speech. |
+| `--min-speech-duration` | `0.2` s | Discard regions with less detected speech. |
+| `--min-silence-duration` | `0.5` s | Silence needed to close a speech region. |
+| `--pre-buffer-duration` | `0.2` s | Retain source audio before detected onset. |
+| `--max-segment-duration` | `30.0` s | Split the detected speech span at this length; the first clip can also include onset pre-buffer. |
+| `--snap-splits-to-sentences` / `--no-snap-splits-to-sentences` | enabled | Keep whole sentences or use smoothed word runs. |
+| `--min-speaker-run-tokens` | `2` | Minimum word count for a credible speaker change. |
+| `--min-speaker-run-duration` | `0.4` s | Minimum span of a credible speaker change. |
+
+Speaker grouping options take effect with diarization enabled. The minimum run
+settings smooth short fluctuations in word mode and determine whether a trailing
+speaker switch can label a whole sentence in sentence mode. VAD processing stays
+mono float32 at 16 kHz with 512-sample windows; timing gates are evaluated at that
+window resolution. The effective configurations are logged at startup, and
+invalid values, including non-finite durations, fail before model loading.
+
+To select the current ROB ASR configuration's 0.25-second silence gate and
+0.5-second onset pre-buffer, append:
+
+```bash
+--vad-threshold 0.5 \
+--min-silence-duration 0.25 \
+--pre-buffer-duration 0.5
+```
+
+Use a fresh output directory when changing segmentation settings: batch resume
+does not yet check the configuration. `tests/test_segmentation_cli.py` verifies
+both runners' defaults, runtime validation, changed VAD boundaries, and sentence
+versus word grouping through the offline processor, using model test doubles.
 
 Audio features load each group's WAV. Visual features use the original video
 and the same absolute `[start_time, end_time)` interval, for ViT, landmarks, and
@@ -207,13 +250,35 @@ outputs = model(**model_inputs)
 ```
 
 Text context is causal and never includes reference sentiment or emotion
-labels. Known speaker IDs map to stable conversation-local slots; `UNKNOWN`
-maps to slot zero and reserves that slot. The current two-speaker checkpoint
-therefore accepts two known voices, or one known voice plus `UNKNOWN`; more
-distinct labels raise an explicit error. Handling unknown turns alongside two
-known voices remains a subsequent integration step. The selected checkpoint must
-have the same text, audio, visual, and
-speaker dimensions as the loaded encoders.
+labels. Speech segments and diarization intervals trim speaker IDs and normalize
+case variants of `unknown` to `UNKNOWN`. Known identities retain their case and
+scope (for example, `EUT_speaker1` is not silently merged with `speaker1`). Known
+speakers map to stable conversation-local slots in order of first appearance.
+
+The default `unknown_speaker_policy="omit_embedding"` retains UNKNOWN turns and
+their text, audio, visual features, and conversation context, while omitting
+their speaker embedding. UNKNOWN has a zero speaker-mask row and does not occupy
+a known-speaker slot. `to_torch_batch()` supplies a boolean `speaker_known_mask`
+when needed; the ERC transformer uses it to zero only the speaker embedding,
+leaving the utterance active in attention. This supports two known voices plus
+any number of unresolved turns with the existing IEMOCAP checkpoint. It adds no
+trained speaker class and does not use the checkpoint's padding row as an
+unknown identity. More than two known voices raises a capacity error before
+feature extraction, listing the required slots and known speaker IDs.
+
+Both runners expose `--unknown-speaker-policy omit_embedding` (the default).
+For earlier runs' behavior, use `--unknown-speaker-policy reserve_slot` or pass
+`unknown_speaker_policy="reserve_slot"` to `ERCFeatureBridge`. That policy
+reserves slot zero for UNKNOWN and accepts at most one known voice alongside it.
+Use a fresh output directory when changing this policy: batch resume does not
+check it. Omitting unknown embeddings changes predictions for unresolved turns;
+emotion accuracy still needs evaluation. The selected checkpoint must have the
+same text, audio, visual, and speaker dimensions as the loaded encoders.
+
+`tests/test_erc_speaker_policy.py` runs the real ERC transformer with a small test
+checkpoint. It checks zero unknown embeddings across all nine transformer paths,
+retained turn attention and output labels, checkpoint reloading, and unchanged
+known-only and legacy calls. These are behavior tests, not an accuracy benchmark.
 
 Run the complete ROB VAD/ASR to IEMOCAP ERC pipeline with:
 

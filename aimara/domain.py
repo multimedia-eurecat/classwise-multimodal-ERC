@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from .speaker_ids import normalize_speaker_id
+
 
 @dataclass(frozen=True)
 class SpeechSegment:
@@ -24,6 +26,7 @@ class SpeechSegment:
     def __post_init__(self) -> None:
         object.__setattr__(self, "source_video", Path(self.source_video))
         object.__setattr__(self, "audio_path", Path(self.audio_path))
+        object.__setattr__(self, "speaker_id", normalize_speaker_id(self.speaker_id))
 
         if not self.conversation_id.strip():
             raise ValueError("conversation_id must not be empty")
@@ -33,8 +36,6 @@ class SpeechSegment:
             raise ValueError("start_time must be non-negative")
         if self.end_time <= self.start_time:
             raise ValueError("end_time must be greater than start_time")
-        if not self.speaker_id.strip():
-            raise ValueError("speaker_id must not be empty")
 
     @property
     def duration(self) -> float:

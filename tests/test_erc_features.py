@@ -43,7 +43,7 @@ class ERCFeatureBridgeTests(unittest.TestCase):
         self.assertEqual(features.audio.shape, (2, 3))
         self.assertEqual(features.visual.shape, (2, 4))
         self.assertEqual(features.text.dtype, np.float32)
-        np.testing.assert_array_equal(features.speaker_mask, [[1, 0], [1, 0]])
+        np.testing.assert_array_equal(features.speaker_mask, [[0, 0], [0, 0]])
 
     def test_assigns_known_speakers_to_stable_slots(self):
         encoder = FakeEncoder(1)
@@ -55,12 +55,113 @@ class ERCFeatureBridgeTests(unittest.TestCase):
 
         np.testing.assert_array_equal(features.speaker_mask, [[1, 0], [0, 1]])
 
+    def test_unknown_turns_preserve_two_known_speaker_slots_and_all_rows(self):
+        import torch
+
+        encoder = FakeEncoder(1)
+        bridge = ERCFeatureBridge(encoder, encoder, encoder)
+        labels = (" unknown ", "Alice", "Bob", "UNKNOWN", "Alice", "Bob")
+        features = bridge.build(
+            [make_segment(i, float(i), label) for i, label in enumerate(labels)]
+        )
+        self.assertEqual(encoder.seen, tuple(range(6)))
+        self.assertEqual(
+            [s.speaker_id for s in features.segments],
+            ["UNKNOWN", "Alice", "Bob", "UNKNOWN", "Alice", "Bob"],
+        )
+        np.testing.assert_array_equal(
+            features.speaker_mask, [[0, 0], [1, 0], [0, 1], [0, 0], [1, 0], [0, 1]]
+        )
+        batch = features.to_torch_batch()
+        self.assertEqual(batch["speaker_known_mask"].dtype, torch.bool)
+        self.assertEqual(
+            batch["speaker_known_mask"].tolist(),
+            [[False, True, True, False, True, True]],
+        )
+        self.assertEqual(batch["u_mask"].tolist(), [[1] * 6])
+        self.assertEqual(batch["dia_len"], [6])
+
+    def test_aliases_normalize_before_feature_extraction(self):
+        encoder = FakeEncoder(1)
+        bridge = ERCFeatureBridge(
+            encoder, encoder, encoder, unknown_speaker_id="unresolved"
+        )
+        features = bridge.build(
+            [make_segment(0, 0, " UnResolved "), make_segment(1, 1, "unknown")]
+        )
+        self.assertEqual(
+            [s.speaker_id for s in features.segments], ["UNKNOWN", "UNKNOWN"]
+        )
+        np.testing.assert_array_equal(features.speaker_mask, [[0, 0], [0, 0]])
+
+    def test_capacity_errors_precede_encoders_under_both_policies(self):
+        cases = (
+            ("omit_embedding", ("Alice", "Bob", "Carol")),
+            ("reserve_slot", ("unknown", "Alice", "Bob")),
+        )
+        for policy, labels in cases:
+            with self.subTest(policy=policy):
+                encoder = FakeEncoder(1)
+                bridge = ERCFeatureBridge(
+                    encoder, encoder, encoder, unknown_speaker_policy=policy
+                )
+                with self.assertRaisesRegex(
+                    ValueError, "requires 3 speaker slots; checkpoint supports 2"
+                ):
+                    bridge.build(
+                        [
+                            make_segment(i, float(i), label)
+                            for i, label in enumerate(labels)
+                        ]
+                    )
+                self.assertIsNone(encoder.seen)
+
+    def test_reserve_slot_preserves_the_legacy_unknown_policy(self):
+        encoder = FakeEncoder(1)
+        bridge = ERCFeatureBridge(
+            encoder, encoder, encoder, unknown_speaker_policy="reserve_slot"
+        )
+        features = bridge.build(
+            [
+                make_segment(0, 0, "Alice"),
+                make_segment(1, 1, "unknown"),
+                make_segment(2, 2, "Alice"),
+            ]
+        )
+        np.testing.assert_array_equal(features.speaker_mask, [[0, 1], [1, 0], [0, 1]])
+        self.assertNotIn("speaker_known_mask", features.to_torch_batch())
+
+    def test_rejects_invalid_speaker_policy(self):
+        encoder = FakeEncoder(1)
+        with self.assertRaisesRegex(ValueError, "unknown_speaker_policy"):
+            ERCFeatureBridge(
+                encoder, encoder, encoder, unknown_speaker_policy="assign_to_nearest"
+            )
+
+    def test_rejects_invalid_speaker_masks_and_zero_rows_for_known_speakers(self):
+        for mask, speaker in (
+            ([0.5, 0.5], "Alice"),
+            ([-1, 2], "Alice"),
+            ([1, 1], "Alice"),
+            ([0, 0], "Alice"),
+        ):
+            with self.subTest(mask=mask), self.assertRaisesRegex(ValueError, "speaker"):
+                ConversationFeatures(
+                    segments=(make_segment(0, 0, speaker),),
+                    text=np.zeros((1, 1)),
+                    audio=np.zeros((1, 1)),
+                    visual=np.zeros((1, 1)),
+                    speaker_mask=np.array([mask]),
+                )
+
     def test_rejects_multiple_conversations_and_duplicate_segment_ids(self):
         encoder = FakeEncoder(1)
         bridge = ERCFeatureBridge(encoder, encoder, encoder)
 
         with self.assertRaisesRegex(ValueError, "one conversation"):
-            bridge.build([make_segment(0, 0.0), make_segment(1, 1.0, conversation_id="other")])
+            bridge.build(
+                [make_segment(0, 0.0), make_segment(1, 1.0, conversation_id="other")]
+            )
         with self.assertRaisesRegex(ValueError, "unique"):
             bridge.build([make_segment(0, 0.0), make_segment(0, 1.0)])
 
@@ -89,6 +190,7 @@ class ERCFeatureBridgeTests(unittest.TestCase):
         self.assertEqual(tuple(batch["qmask"].shape), (1, 2, 2))
         self.assertEqual(tuple(batch["u_mask"].shape), (1, 2))
         self.assertEqual(batch["dia_len"], [2])
+        self.assertEqual(batch["speaker_known_mask"].tolist(), [[False, False]])
 
 
 if __name__ == "__main__":

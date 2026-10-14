@@ -30,6 +30,22 @@ class SpeakerTimelineTests(unittest.TestCase):
             SpeakerInterval(10, 20, "unknown"),
         ]
         self.assertEqual(speaker_for_region(SpeechRegion(10, 20), timeline), "UNKNOWN")
+        self.assertEqual(timeline[1].speaker_id, "UNKNOWN")
+
+    def test_unknown_spellings_share_coverage_and_custom_output_alias(self):
+        timeline = [
+            SpeakerInterval(0, 3, " unknown "),
+            SpeakerInterval(3, 6, "UnKnOwN"),
+            SpeakerInterval(6, 10, " speaker1 "),
+        ]
+        self.assertEqual(speaker_for_region(SpeechRegion(0, 10), timeline), "UNKNOWN")
+        self.assertEqual(
+            speaker_for_region(
+                SpeechRegion(0, 10), timeline, unknown_speaker_id="unresolved"
+            ),
+            "unresolved",
+        )
+        self.assertEqual(timeline[-1].speaker_id, "speaker1")
 
     def test_interval_validates_boundaries_speaker_and_score(self):
         for args in [

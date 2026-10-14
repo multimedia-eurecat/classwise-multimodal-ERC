@@ -53,6 +53,7 @@ class DiarizationRunnerTests(unittest.TestCase):
             ]
         )
         self.assertEqual(args.diarization_weights, Path("speakers"))
+        self.assertEqual(args.unknown_speaker_policy, "omit_embedding")
 
     def test_pipeline_wires_the_selected_diarizer_and_default_does_not_load_it(self):
         for enabled in (False, True):
@@ -62,7 +63,11 @@ class DiarizationRunnerTests(unittest.TestCase):
                 "--diarization-weights",
                 "speakers",
             ]
-            args = self.arguments(*(extra if enabled else []))
+            args = self.arguments(
+                *(extra if enabled else []),
+                "--unknown-speaker-policy",
+                "reserve_slot" if enabled else "omit_embedding",
+            )
             diarizer = object()
             # Avoid loading the ERC encoders; exercise real pipeline/processor construction.
             import sys
@@ -87,6 +92,10 @@ class DiarizationRunnerTests(unittest.TestCase):
                 pipeline = build_pipeline(args)
             self.assertIs(
                 pipeline.speech_processor.diarizer, diarizer if enabled else None
+            )
+            self.assertEqual(
+                pipeline.feature_bridge.unknown_speaker_policy,
+                "reserve_slot" if enabled else "omit_embedding",
             )
             if enabled:
                 load.assert_called_once_with(weights_dir=Path("speakers"), device=None)

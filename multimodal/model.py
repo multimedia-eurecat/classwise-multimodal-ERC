@@ -870,7 +870,7 @@ class Transformer_Based_Model(nn.Module):
 
 
     def forward(self, textf, visuf, acouf, u_mask, qmask, dia_len, labels=None, 
-                shift_severity=None, force_drop_modalities=None):
+                shift_severity=None, force_drop_modalities=None, speaker_known_mask=None):
         spk_idx = torch.argmax(qmask, -1)
         origin_spk_idx = spk_idx
         device = spk_idx.device
@@ -892,6 +892,17 @@ class Transformer_Based_Model(nn.Module):
                 self.speaker_embeddings.embedding_dim,
                 device=spk_idx.device,
                 dtype=self.speaker_embeddings.weight.dtype,
+            )
+
+        if speaker_known_mask is not None:
+            if speaker_known_mask.shape != spk_idx.shape:
+                raise ValueError("speaker_known_mask must match the batch and utterance dimensions")
+            if speaker_known_mask.dtype != torch.bool:
+                raise ValueError("speaker_known_mask must be boolean")
+            # Missing identity is no speaker signal, not a third identity or a
+            # padded utterance. u_mask still retains this turn in attention.
+            spk_embeddings = spk_embeddings.masked_fill(
+                ~speaker_known_mask.to(device).unsqueeze(-1), 0.0
             )
 
         force_drop_modalities = set(force_drop_modalities or [])

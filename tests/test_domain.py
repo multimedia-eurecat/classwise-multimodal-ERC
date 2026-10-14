@@ -32,6 +32,18 @@ class SpeechSegmentTests(unittest.TestCase):
 
         self.assertEqual(segment.transcript, "")
 
+    def test_canonicalizes_unknown_ids_and_trims_known_ids(self):
+        for label in ("unknown", " UnKnOwN ", "UNKNOWN"):
+            with self.subTest(label=label):
+                self.assertEqual(
+                    self.make_segment(speaker_id=label).speaker_id, "UNKNOWN"
+                )
+        for label in ("speaker1", "EUT_speaker1", "Alice", "alice"):
+            with self.subTest(label=label):
+                self.assertEqual(
+                    self.make_segment(speaker_id=f" {label} ").speaker_id, label
+                )
+
     def test_rejects_invalid_identifiers_and_times(self):
         invalid_values = [
             ({"conversation_id": " "}, "conversation_id"),

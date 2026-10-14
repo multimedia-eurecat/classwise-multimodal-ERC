@@ -94,14 +94,19 @@ class ROBProcessorConfig:
             raise ValueError("chunk_size must be positive")
         if not 0.0 <= self.vad_threshold <= 1.0:
             raise ValueError("vad_threshold must be between 0 and 1")
-        if self.min_speech_duration < 0:
-            raise ValueError("min_speech_duration must be non-negative")
-        if self.min_silence_duration < 0:
-            raise ValueError("min_silence_duration must be non-negative")
-        if self.pre_buffer_duration < 0:
-            raise ValueError("pre_buffer_duration must be non-negative")
-        if self.max_segment_duration <= 0:
-            raise ValueError("max_segment_duration must be positive")
+        for name in (
+            "min_speech_duration",
+            "min_silence_duration",
+            "pre_buffer_duration",
+        ):
+            value = getattr(self, name)
+            if not math.isfinite(value) or value < 0:
+                raise ValueError(f"{name} must be finite and non-negative")
+        if (
+            not math.isfinite(self.max_segment_duration)
+            or self.max_segment_duration <= 0
+        ):
+            raise ValueError("max_segment_duration must be finite and positive")
         if self.min_speech_duration > self.max_segment_duration:
             raise ValueError("min_speech_duration must not exceed max_segment_duration")
 

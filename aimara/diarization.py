@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from .segmentation import SpeechRegion
+from .speaker_ids import normalize_speaker_id
 
 
 @dataclass(frozen=True)
@@ -18,8 +19,7 @@ class SpeakerInterval(SpeechRegion):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        if not self.speaker_id.strip():
-            raise ValueError("speaker_id must not be empty")
+        object.__setattr__(self, "speaker_id", normalize_speaker_id(self.speaker_id))
         if not math.isfinite(self.confidence) or not (
             self.confidence == -1.0 or 0.0 <= self.confidence <= 1.0
         ):
@@ -41,9 +41,9 @@ def speaker_for_region(
         )
         if overlap <= 0:
             continue
-        speaker = interval.speaker_id.strip()
-        if speaker.casefold() == "unknown":
-            speaker = unknown_speaker_id
+        speaker = normalize_speaker_id(
+            interval.speaker_id, unknown_speaker_id=unknown_speaker_id
+        )
         coverage[speaker] = coverage.get(speaker, 0) + overlap
         covered += overlap
 
