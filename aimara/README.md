@@ -23,7 +23,7 @@ deriving an input feature from the ground-truth emotion label.
 ## ROB speech dependencies
 
 The VAD adapter uses PyTorch and the Silero model loaded through Torch Hub. The
-ASR adapter uses the same Faster-Whisper version pinned by the ROB repository:
+default Whisper ASR adapter uses the same Faster-Whisper version pinned by the ROB repository:
 
 ```bash
 python -m pip install faster-whisper==1.2.1
@@ -106,6 +106,80 @@ as well as runtime. Use a fresh output directory for comparisons because batch
 resume does not yet check inference settings. `tests/test_rob_asr.py` and
 `tests/test_whisper_cli.py` cover options, CPU fallback, chunk coverage, timing
 retention, state reset after lazy failures, and both runner paths with test doubles.
+
+### Optional Parakeet transcriber
+
+Both runners accept `--asr-backend whisper` (the default) or
+`--asr-backend parakeet`. The optional backend uses NeMo and the default
+[`nvidia/parakeet-tdt-0.6b-v3` model](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3).
+It supports English and Spanish among 25 European languages; Catalan requires
+Whisper. Explicit unsupported language requests fail before any model loads.
+
+Install the optional dependencies in a separate environment compatible with the
+ERC and VAD packages:
+
+```bash
+python -m pip install -r aimara/requirements-parakeet.txt
+```
+
+That file pins `nemo_toolkit[asr]==2.4.0`, matching ROB. Installation can change
+shared ML dependencies, so the existing `aimara_env` has not been modified.
+Importing `aimara.rob` and running Whisper do not import or require NeMo.
+
+To select Parakeet, append these options to an existing runner command:
+
+```bash
+--asr-backend parakeet \
+--parakeet-model nvidia/parakeet-tdt-0.6b-v3 \
+--language en,es
+```
+
+`--asr-weights` is the backend's cache directory. Parakeet loads the cached
+Hugging Face `.nemo` checkpoint or downloads it on explicit loading. A local file
+can be selected with `--parakeet-model /path/to/model.nemo`. Use
+`--parakeet-local-files-only` to require cached or local checkpoints. The model
+runs in float32 on the selected CPU/CUDA device and warms up once; disable warm-up
+with `--no-parakeet-warmup`. The Whisper model, precision, beam, and batching
+options apply only to the Whisper backend.
+
+Parakeet automatically transcribes the input language and does not accept a
+language-forcing argument. Here `--language en` supplies an assumed output label;
+it does not establish that English was detected. For `auto` or a comma-separated
+list, the optional `langid_ambernet` identifier selects the label from supported
+candidates. Configure it with `--parakeet-language-id-model` (a NeMo model name
+or local `.nemo` file) and `--parakeet-language-id-min-confidence` (default `0.9`).
+An empty identifier name disables it. For local-only operation, the identifier
+also needs a cached or local checkpoint. Unavailable identification, low
+confidence, or audio shorter than 0.25 seconds leaves `Transcript.language`
+unset. No previous recording's label is reused. A language label cannot certify
+that unsupported-language speech was transcribed correctly.
+
+```python
+from aimara.rob import ParakeetConfig, ParakeetTranscriber
+
+asr = ParakeetTranscriber.from_nemo(
+    weights_dir="/path/to/parakeet-weights",
+    config=ParakeetConfig(language="en,es"),
+    device="cuda",
+)
+transcript = asr.transcribe(segment_audio, sample_rate=16000)
+```
+
+The adapter requires mono float32 audio at 16 kHz, as supplied by the offline
+processor. It converts NeMo frame offsets using the encoder subsampling factor
+and preprocessor stride, or retains already converted seconds. Word text receives
+leading spaces so the shared sentence/word segmenter can use it. Each word is
+assigned to at most one backend sentence; incomplete sentence metadata falls
+back to a whole transcript span while preserving the text. Missing alignment
+retains the full input interval. A NeMo word-confidence aggregation failure is
+retried once with confidence disabled, then the decoding settings are restored.
+
+`tests/test_parakeet.py` and `tests/test_parakeet_cli.py` cover these adapters,
+optional loading, backend selection, and speaker-aware WAV/prediction output
+with model test doubles. Actual Parakeet/AmberNet inference has not been run:
+NeMo and their weights are absent from the current environment. Runtime,
+transcript accuracy, and emotion accuracy still require evaluation. Use a fresh
+output directory when changing backends because batch resume does not check it.
 
 The models are composed by the offline processor, which writes a WAV for each
 returned `SpeechSegment`. With diarization disabled it returns one segment per

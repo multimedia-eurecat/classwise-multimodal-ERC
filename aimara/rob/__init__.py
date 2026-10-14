@@ -2,6 +2,7 @@
 
 from .asr import ROBTranscriber, WhisperInferenceConfig
 from .diarization import ROBSpeakerDiarizer
+from .parakeet import ParakeetConfig, ParakeetTranscriber
 from .vad import ROBVoiceActivityDetector
 
 __all__ = [
@@ -9,4 +10,6 @@ __all__ = [
     "ROBTranscriber",
     "ROBVoiceActivityDetector",
     "WhisperInferenceConfig",
+    "ParakeetConfig",
+    "ParakeetTranscriber",
 ]

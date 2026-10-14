@@ -12,6 +12,8 @@ from .erc_model import ERCEmotionModel, ERCModelProfile
 from .offline_processor import OfflineROBProcessor
 from .pipeline import AIMARAPipeline
 from .rob import (
+    ParakeetConfig,
+    ParakeetTranscriber,
     ROBSpeakerDiarizer,
     ROBTranscriber,
     ROBVoiceActivityDetector,
@@ -26,8 +28,17 @@ from .vad_processing import OfflineVADProcessor
 def add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--vad-weights", type=Path, required=True)
-    parser.add_argument("--asr-weights", type=Path, required=True)
-    parser.add_argument("--asr-model", default="tiny.en")
+    parser.add_argument(
+        "--asr-weights", type=Path, required=True, help="ASR model cache directory"
+    )
+    parser.add_argument(
+        "--asr-backend", choices=("whisper", "parakeet"), default="whisper"
+    )
+    parser.add_argument(
+        "--asr-model",
+        default="tiny.en",
+        help="Whisper model alias (Whisper backend only)",
+    )
     parser.add_argument(
         "--diarization-backend", choices=("none", "redimnet2"), default="none"
     )
@@ -47,7 +58,7 @@ def add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--device", choices=("cpu", "cuda"), default=None)
 
     asr_defaults = WhisperInferenceConfig()
-    asr = parser.add_argument_group("Whisper inference")
+    asr = parser.add_argument_group("Whisper inference (Whisper backend only)")
     asr.add_argument(
         "--asr-compute-type",
         choices=WHISPER_COMPUTE_TYPES,
@@ -77,6 +88,36 @@ def add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
         type=int,
         default=asr_defaults.beam_size,
         help="Whisper beam search size (default: %(default)s)",
+    )
+
+    parakeet_defaults = ParakeetConfig()
+    parakeet = parser.add_argument_group("Parakeet inference (optional NeMo backend)")
+    parakeet.add_argument(
+        "--parakeet-model",
+        default=parakeet_defaults.model_name,
+        help="Hugging Face repo ID or local .nemo checkpoint (default: %(default)s)",
+    )
+    parakeet.add_argument(
+        "--parakeet-language-id-model",
+        default=parakeet_defaults.language_id_model,
+        help="NeMo language identifier or .nemo path; empty disables it (default: %(default)s)",
+    )
+    parakeet.add_argument(
+        "--parakeet-language-id-min-confidence",
+        type=float,
+        default=parakeet_defaults.language_id_min_confidence,
+        help="Minimum confidence for automatic language metadata (default: %(default)s)",
+    )
+    parakeet.add_argument(
+        "--parakeet-local-files-only",
+        action="store_true",
+        help="Use cached/local Parakeet and language-ID checkpoints",
+    )
+    parakeet.add_argument(
+        "--parakeet-warmup",
+        action=argparse.BooleanOptionalAction,
+        default=parakeet_defaults.warm_up,
+        help="Warm up the Parakeet model once at startup",
     )
 
     defaults = ROBProcessorConfig()
@@ -187,10 +228,36 @@ def build_asr_config(args: argparse.Namespace) -> WhisperInferenceConfig:
     )
 
 
+def build_parakeet_config(args: argparse.Namespace) -> ParakeetConfig:
+    defaults = ParakeetConfig()
+    return ParakeetConfig(
+        model_name=getattr(args, "parakeet_model", defaults.model_name),
+        language=args.language,
+        language_id_model=getattr(
+            args, "parakeet_language_id_model", defaults.language_id_model
+        ),
+        language_id_min_confidence=getattr(
+            args,
+            "parakeet_language_id_min_confidence",
+            defaults.language_id_min_confidence,
+        ),
+        local_files_only=getattr(
+            args, "parakeet_local_files_only", defaults.local_files_only
+        ),
+        warm_up=getattr(args, "parakeet_warmup", defaults.warm_up),
+    )
+
+
 def build_pipeline(args: argparse.Namespace) -> AIMARAPipeline:
     config, speaker_config = build_segmentation_configs(args)
-    asr_config = build_asr_config(args)
-    ROBTranscriber.validate_model_size(args.asr_model)
+    asr_backend = getattr(args, "asr_backend", "whisper")
+    if asr_backend == "whisper":
+        asr_config = build_asr_config(args)
+        ROBTranscriber.validate_model_size(args.asr_model)
+    elif asr_backend == "parakeet":
+        parakeet_config = build_parakeet_config(args)
+    else:
+        raise ValueError("asr_backend must be whisper or parakeet")
     diarization_backend = getattr(args, "diarization_backend", "none")
     diarization_weights = getattr(args, "diarization_weights", None)
     if diarization_backend == "redimnet2" and diarization_weights is None:
@@ -201,20 +268,27 @@ def build_pipeline(args: argparse.Namespace) -> AIMARAPipeline:
     logging.getLogger(__name__).info(
         "Speaker grouping (%s): %s", diarization_backend, speaker_config
     )
+    if asr_backend == "parakeet":
+        transcriber = ParakeetTranscriber.from_nemo(
+            weights_dir=args.asr_weights,
+            config=parakeet_config,
+            device=args.device,
+        )
+    else:
+        transcriber = ROBTranscriber.from_faster_whisper(
+            model_size=args.asr_model,
+            weights_dir=args.asr_weights,
+            language=args.language,
+            device=args.device,
+            compute_type=asr_config.compute_type,
+            cpu_compute_type=asr_config.cpu_compute_type,
+            use_batched_inference=asr_config.use_batched_inference,
+            batch_size=asr_config.batch_size,
+            beam_size=asr_config.beam_size,
+        )
     vad = ROBVoiceActivityDetector.from_torch_hub(
         weights_dir=args.vad_weights,
         device=args.device,
-    )
-    transcriber = ROBTranscriber.from_faster_whisper(
-        model_size=args.asr_model,
-        weights_dir=args.asr_weights,
-        language=args.language,
-        device=args.device,
-        compute_type=asr_config.compute_type,
-        cpu_compute_type=asr_config.cpu_compute_type,
-        use_batched_inference=asr_config.use_batched_inference,
-        batch_size=asr_config.batch_size,
-        beam_size=asr_config.beam_size,
     )
     speech_processor = OfflineROBProcessor(
         vad_processor=OfflineVADProcessor(vad, config),

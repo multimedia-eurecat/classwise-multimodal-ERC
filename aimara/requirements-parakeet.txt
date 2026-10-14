@@ -1,0 +1,4 @@
+# Optional backend, matching EutSpeechAudioProcessing's NeMo version.
+# Install in a separate compatible environment; these dependencies may change
+# the shared ERC environment's ML packages. Whisper does not require this file.
+nemo_toolkit[asr]==2.4.0
