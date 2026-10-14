@@ -12,7 +12,7 @@ from facenet_pytorch import MTCNN
 from transformers import AutoImageProcessor, AutoModelForImageClassification
 
 from .utils import (
-    sample_frame_indices,
+    sample_window_frame_indices,
     read_frame_at,
     pick_face_index,
     apply_margin_xyxy,
@@ -306,15 +306,10 @@ def extract_utterance_landmark_embedding(
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps   = cap.get(cv2.CAP_PROP_FPS) or 25.0
 
-    # IEMOCAP: restrict to utterance time window within dialog video
-    if start_sec is not None or end_sec is not None:
-        frame_start = int((start_sec or 0.0) * fps)
-        frame_end   = int((end_sec or (total / fps)) * fps)
-        frame_start = max(0, min(frame_start, total - 1))
-        frame_end   = max(frame_start + 1, min(frame_end, total))
-        idxs = frame_start + sample_frame_indices(frame_end - frame_start, num_frames)
-    else:
-        idxs = sample_frame_indices(total, num_frames)
+    idxs = sample_window_frame_indices(total, fps, num_frames, start_sec, end_sec)
+    if idxs.size == 0:
+        cap.release()
+        return zero
 
     # ── ASD path ──────────────────────────────────────────────────────────────
     if asd is not None:
@@ -322,10 +317,9 @@ def extract_utterance_landmark_embedding(
         speaker_boxes = asd.get_speaker_boxes(
             video_path=video_path, frame_indices=idxs, mtcnn=mtcnn,
             iou_threshold=asd_iou_threshold, asd_threshold=asd_threshold,
-            max_seconds=(end_sec - start_sec + 2.0)
-                        if (start_sec is not None and end_sec is not None)
-                        else asd_max_seconds,
+            max_seconds=None if end_sec is not None else asd_max_seconds,
             start_sec=start_sec or 0.0,
+            end_sec=end_sec,
         )
         return _landmarks_with_boxes(
             video_path=video_path, frame_indices=idxs,
@@ -495,7 +489,7 @@ def extract_utterance_visual_embedding(
 
     """
     Returns float32 (D,) ViT embedding for one utterance clip.
-    start_sec/end_sec: restrict frame sampling to a time window (IEMOCAP).
+    start_sec/end_sec: sample only timestamps in [start_sec, end_sec).
     """
     if not os.path.exists(video_path):
         return np.zeros((embed_dim,), dtype=np.float32)
@@ -507,14 +501,10 @@ def extract_utterance_visual_embedding(
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps   = cap.get(cv2.CAP_PROP_FPS) or 25.0
 
-    if start_sec is not None or end_sec is not None:
-        frame_start = int((start_sec or 0.0) * fps)
-        frame_end   = int((end_sec or (total / fps)) * fps)
-        frame_start = max(0, min(frame_start, total - 1))
-        frame_end   = max(frame_start + 1, min(frame_end, total))
-        idxs = frame_start + sample_frame_indices(frame_end - frame_start, num_frames)
-    else:
-        idxs = sample_frame_indices(total, num_frames)
+    idxs = sample_window_frame_indices(total, fps, num_frames, start_sec, end_sec)
+    if idxs.size == 0:
+        cap.release()
+        return np.zeros((embed_dim,), dtype=np.float32)
 
     # ── ASD path ──────────────────────────────────────────────────────────────
     if asd is not None:
@@ -525,10 +515,9 @@ def extract_utterance_visual_embedding(
             mtcnn=mtcnn,
             iou_threshold=asd_iou_threshold,
             asd_threshold=asd_threshold,
-            max_seconds=(end_sec - start_sec + 2.0)
-                        if (start_sec is not None and end_sec is not None)
-                        else asd_max_seconds,
+            max_seconds=None if end_sec is not None else asd_max_seconds,
             start_sec=start_sec or 0.0,
+            end_sec=end_sec,
         )
         return _embed_with_boxes(
             video_path=video_path,

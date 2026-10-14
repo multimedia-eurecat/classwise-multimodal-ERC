@@ -163,6 +163,23 @@ stay with the outer groups. The WAVs partition the VAD region without duplicated
 or discarded samples, even when estimated word times overlap. ASR still runs once
 per VAD region, and segment IDs are unique across the whole recording.
 
+Audio features load each group's WAV. Visual features use the original video
+and the same absolute `[start_time, end_time)` interval, for ViT, landmarks, and
+expression landmarks. With the current constant-FPS reader, only frames whose
+`frame_index / fps` falls in that interval are sampled. Adjacent groups do not
+share a boundary frame. An interval with no frames, including one beyond the
+video's end, produces a zero visual feature rather than borrowing another
+group's frame. Optional active-speaker detection uses the same frame offset and
+limits its audio and video to that group, without the previous two-second tail.
+The audio encoder retains its existing synthetic silence padding and RMS
+normalization.
+
+`tests/test_multimodal_segment_alignment.py` checks this path using a generated
+lossless video with numbered frames and known PCM, including A/B/A turns,
+fractional boundaries, all three visual modes, and active-speaker offsets.
+It uses the real media readers and encoder adapters with model inference replaced
+by test doubles; it requires FFmpeg and the unimodal Python dependencies.
+
 ## ERC feature bridge
 
 The feature bridge converts the ordered `SpeechSegment` objects into the text,

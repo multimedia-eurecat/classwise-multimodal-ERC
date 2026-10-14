@@ -45,9 +45,10 @@ import torch
 import torch.nn.functional as F
 from scipy.signal import resample
 
-from utils import (
+from .utils import (
     read_all_frames,
     extract_raw_audio,
+    frame_index_at_or_after,
     iou_xyxy,
     apply_margin_xyxy,
 )
@@ -313,12 +314,13 @@ class LightASDWrapper:
                           iou_threshold: float = 0.5, asd_threshold: float = 0.5, 
                           max_seconds: Optional[float] = None,
                           start_sec: float = 0.0,
+                          end_sec: Optional[float] = None,
                           ) -> Dict[int, Optional[np.ndarray]]:
         """
         Main entry point. Given a video and the frame indices to embed,
         returns the bounding box of the active speaker for each frame.
 
-        start_sec: seek to this position before reading frames (IEMOCAP use).
+        start_sec/end_sec: restrict both source frames and audio to this window.
                    frame_indices are still absolute — they are offset internally.
                    Default 0.0 → MELD behaviour completely unchanged.
 
@@ -328,17 +330,15 @@ class LightASDWrapper:
         """
         # 1. Read frames starting from start_sec up to max_seconds
         frames, fps = read_all_frames(video_path, max_seconds=max_seconds,
-                                      start_sec=start_sec)
+                                      start_sec=start_sec, end_sec=end_sec)
         if not frames:
             return {int(fi): None for fi in frame_indices}
 
         fps = fps if fps > 0 else 25.0
         n_frames = len(frames)
 
-        # Offset: absolute frame index → relative index into frames list
-        # For MELD: start_sec=0.0 → frame_offset=0 → no change
-        # For IEMOCAP: start_sec=18.5 → frame_offset=462 (at 25fps)
-        frame_offset = int(start_sec * fps)
+        # Use the same frame seek as read_all_frames, including fractional starts.
+        frame_offset = frame_index_at_or_after(start_sec, fps)
 
         # 2. Detect faces in every frame
         all_boxes: List[Optional[np.ndarray]] = []
@@ -358,9 +358,13 @@ class LightASDWrapper:
         if audio is None or len(audio) == 0:
             return {int(fi): None for fi in frame_indices}
 
-        if start_sec > 0.0:
-            audio_start_sample = int(start_sec * 16000)
-            audio = audio[audio_start_sample:]
+        audio_start_sample = round(frame_offset / fps * 16000)
+        audio_end_sec = (frame_offset + n_frames) / fps
+        if end_sec is not None:
+            audio_end_sec = min(audio_end_sec, end_sec)
+        audio = audio[audio_start_sample:round(audio_end_sec * 16000)]
+        if audio.size == 0:
+            return {int(fi): None for fi in frame_indices}
 
         audio_mfcc = audio_to_mfcc_lightasd(audio, sr=16000, fps=fps, n_frames=n_frames)
 

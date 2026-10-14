@@ -17,6 +17,36 @@ def sample_frame_indices(total_frames: int, num_samples: int) -> np.ndarray:
     return np.linspace(0, total_frames - 1, num=num_samples, dtype=int)
 
 
+def frame_index_at_or_after(seconds: float, fps: float) -> int:
+    """First frame whose timestamp is at or after ``seconds`` (constant FPS)."""
+    if not math.isfinite(fps) or fps <= 0:
+        raise ValueError("fps must be finite and positive")
+    if not math.isfinite(seconds) or seconds < 0:
+        raise ValueError("frame time must be finite and non-negative")
+    # Avoid moving an exact frame boundary forward because of float rounding.
+    return max(0, math.ceil(np.nextafter(seconds * fps, -np.inf)))
+
+
+def sample_window_frame_indices(
+    total_frames: int, fps: float, num_samples: int,
+    start_sec: Optional[float] = None, end_sec: Optional[float] = None,
+) -> np.ndarray:
+    """Sample source frames within the half-open interval [start_sec, end_sec).
+
+    An interval with no frame timestamps returns no indices, including windows
+    beyond the video. It must not borrow a frame from a neighbouring segment.
+    """
+    if num_samples <= 0:
+        raise ValueError("num_samples must be positive")
+    start = 0 if start_sec is None else frame_index_at_or_after(start_sec, fps)
+    end = max(0, total_frames) if end_sec is None else frame_index_at_or_after(end_sec, fps)
+    if start_sec is not None and end_sec is not None and end_sec <= start_sec:
+        raise ValueError("end_sec must be greater than start_sec")
+    start = min(start, max(0, total_frames))
+    end = min(end, max(0, total_frames))
+    return start + sample_frame_indices(end - start, num_samples)
+
+
 def get_total_frames(video_path: str) -> int:
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -36,13 +66,13 @@ def read_frame_at(cap: cv2.VideoCapture, frame_index: int) -> Optional[np.ndarra
 
 def read_all_frames(video_path: str,
                     max_seconds: Optional[float] = None,
-                    start_sec: float = 0.0) -> Tuple[List[np.ndarray], float]:
+                    start_sec: float = 0.0,
+                    end_sec: Optional[float] = None) -> Tuple[List[np.ndarray], float]:
     """
     Reads frames from a video up to max_seconds, then stops.
     Returns (frames_rgb, fps). Used by ASD which needs full temporal sequence.
 
-    start_sec: seek to this position before reading (IEMOCAP: utterance start).
-               Default 0.0 → MELD behaviour unchanged.
+    start_sec/end_sec: read only frames whose timestamps are in this interval.
     max_seconds must be applied HERE (early exit during reading) not after
     loading all frames — a 5-minute 1080p video is ~44GB if fully loaded.
     """
@@ -50,9 +80,13 @@ def read_all_frames(video_path: str,
     if not cap.isOpened():
         return [], 0.0
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
-    if start_sec > 0.0:
-        cap.set(cv2.CAP_PROP_POS_MSEC, start_sec * 1000.0)
+    frame_start = frame_index_at_or_after(start_sec, fps)
+    if frame_start > 0:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_start)
     max_frames = int(max_seconds * fps) if max_seconds and max_seconds > 0 else None
+    if end_sec is not None:
+        window_frames = max(0, frame_index_at_or_after(end_sec, fps) - frame_start)
+        max_frames = window_frames if max_frames is None else min(max_frames, window_frames)
     frames = []
     while True:
         if max_frames is not None and len(frames) >= max_frames:
