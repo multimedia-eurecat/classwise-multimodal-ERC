@@ -1,0 +1,20 @@
+# Full offline ERC runtime; Python 3.10, Linux x86_64.
+# Select and install a matching Torch/Torchvision/Torchaudio build first.
+-c constraints-runtime.txt
+numpy==1.26.4
+scipy==1.15.2
+pandas==2.3.3
+Pillow==10.2.0
+opencv-python-headless==4.10.0.84
+facenet-pytorch==2.5.3
+transformers==4.51.3
+huggingface-hub==0.30.2
+funasr==1.3.1
+modelscope==1.35.4
+soundfile==0.13.1
+librosa==0.10.2.post1
+numba==0.61.2
+einops==0.8.1
+omegaconf==2.3.0
+accelerate==1.6.0
+

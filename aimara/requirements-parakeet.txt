@@ -1,4 +1,16 @@
-# Optional backend, matching EutSpeechAudioProcessing's NeMo version.
-# Install in a separate compatible environment; these dependencies may change
-# the shared ERC environment's ML packages. Whisper does not require this file.
+# Full pipeline with the optional backend, matching ROB's NeMo version.
+# Install into its own venv; Whisper's requirements never pull in NeMo.
+-r requirements-whisper.txt
 nemo_toolkit[asr]==2.4.0
+# NeMo's broad dependencies otherwise select newer incompatible runtime APIs.
+peft==0.15.2
+lhotse==1.30.3
+pyannote.core==5.0.0
+pyannote.metrics==3.2.1
+lightning==2.4.0
+pytorch-lightning==2.4.0
+torchmetrics==1.6.3
+onnx==1.17.0
+datasets==3.6.0
+wandb==0.19.11
+marshmallow==3.26.1

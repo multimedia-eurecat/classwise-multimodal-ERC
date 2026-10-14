@@ -20,6 +20,91 @@ Use `--no-audio` to validate and convert annotations without running FFmpeg.
 The manifest deliberately omits MELD's optional `Sentiment` field to avoid
 deriving an input feature from the ground-truth emotion label.
 
+## Isolated runtime environments
+
+The runtime profiles target **Python 3.10 on Linux x86_64**. Create one virtual
+environment for Whisper and another for Parakeet; each contains the complete ERC
+pipeline because the runners load speech and emotion models in one process.
+Run installation commands from the repository root. Install the system `ffmpeg`
+package (including `ffprobe`) first; Parakeet's source dependencies also need a
+C/C++ compiler and Python development headers.
+
+If `python3.10` is not on `PATH`, use the full path to a compatible interpreter.
+On this workstation, `/home/Imatge/media/ssd2/oriol/au_env/bin/python` supplies a
+working Python 3.10.20 base for the Parakeet venv. The new venv uses its own
+packages. A venv still inherits the base interpreter's native standard-library
+modules: the `aimara_env` Python's ICU-enabled SQLite conflicts with the system
+C++ library after CPU Torch loads. This appears as `CXXABI_1.3.15 not found` in
+the NeMo/IPython import path despite `pip check` passing. Use a compatible base
+Python rather than upgrading packages to try to solve that native-library issue.
+
+For the CPU Whisper environment:
+
+```bash
+python3.10 -m venv .venv-aimara-whisper
+source .venv-aimara-whisper/bin/activate
+python -m pip --isolated install --index-url https://pypi.org/simple \
+  pip==26.0.1 setuptools==80.9.0 wheel==0.45.1
+python -m pip --isolated install -r aimara/requirements-torch-cpu.txt
+python -m pip --isolated install --index-url https://pypi.org/simple \
+  -r aimara/requirements-whisper.txt
+python -m aimara.check_environment --asr-backend whisper --device cpu
+python -m unittest discover -s tests -q
+```
+
+For Parakeet, create `.venv-aimara-parakeet` instead and replace the final runtime
+requirements file with `aimara/requirements-parakeet.txt`. Check it with
+`python -m aimara.check_environment --asr-backend parakeet --device cpu`.
+The Parakeet profile includes Whisper so either backend is selectable in that
+environment. The Whisper profile does not install NeMo. Avoid `--system-site-packages`
+and installing these profiles into the existing shared `aimara_env`.
+
+`constraints-runtime.txt` pins the resolved direct and transitive dependencies
+for both profiles. Each requirements file applies it automatically; constraints
+for optional dependencies do not install those packages in the Whisper profile.
+Keep the build-tool pins above when recreating an environment. To update the
+profiles, resolve their union in a fresh Python 3.10 environment with the chosen
+Torch build, refresh the constraints (preserving flavor-independent Torch pins),
+and repeat the checks and model smoke runs. These are version pins rather than
+artifact hashes; source-built dependencies also depend on the host compiler.
+
+For CUDA 12.1, install `aimara/requirements-torch-cu121.txt` in place of the CPU
+Torch file, then install the selected runtime profile. Check with `--device cuda`.
+The three Torch packages must use matching build flavors. The installation
+follows the [official Torch version matrix](https://pytorch.org/get-started/previous-versions/).
+Faster-Whisper also needs cuBLAS and cuDNN visible to the system loader; follow
+its [GPU library instructions](https://github.com/SYSTRAN/faster-whisper#gpu).
+The supplied CUDA Torch build uses cuDNN 9. Jetson/ARM and other Python versions
+need their own dependency resolution and validation.
+
+The profiles retain Torch 2.4.1 and use `facenet-pytorch==2.5.3`, whose declared
+dependencies accept that Torch/Torchvision pair. They share Transformers 4.51.3,
+within NeMo 2.4's declared range, and NumPy 1.26.4. Only
+`opencv-python-headless==4.10.0.84` should provide `cv2`; installing multiple
+OpenCV distributions into one environment mixes their files. These profiles
+cover the default text/emotion2vec/ViT path and ReDimNet2; research-only AU,
+landmark, training, and ROS packages are outside their scope.
+
+`check_environment` reports package versions, `pip check` results, system
+executables, runtime import failures, and small NumPy/Torch/OpenCV/face-detector
+operations. It loads the face detector's bundled weights but does not download
+speech or ERC checkpoints. CUDA checks verify device visibility; actual GPU
+inference still needs a model run. Reuse model caches through the existing CLI
+weight arguments and `HF_HOME`/`MODELSCOPE_CACHE` variables; keep caches separate
+from virtual environments. Existing predictions keep their schema and checkpoints
+keep their architecture. Dependency changes are not part of the resume
+fingerprint, so use a new output directory for comparisons across environments.
+
+Validation on 2026-10-14: both CPU profiles installed in isolated `/tmp` venvs,
+with clean `pip check` results and 184 passing tests. Runtime probes exercised
+the real libraries, including NeMo ASR and speaker-model imports in the Parakeet
+profile. The fresh Whisper profile ran the cached `Anger.mp4` through VAD,
+transcription, all three encoders, and the real ERC checkpoint without
+`LD_PRELOAD`. Compared with the shared environment, both turns' transcripts,
+timings and emotion labels matched; the largest probability difference was
+about `1.34e-7`. The existing shared environment was not changed. CUDA profiles
+and trained Parakeet/AmberNet inference still require model/hardware validation.
+
 ## ROB speech dependencies
 
 The VAD adapter uses PyTorch and the Silero model loaded through Torch Hub. The
@@ -115,15 +200,16 @@ Both runners accept `--asr-backend whisper` (the default) or
 It supports English and Spanish among 25 European languages; Catalan requires
 Whisper. Explicit unsupported language requests fail before any model loads.
 
-Install the optional dependencies in a separate environment compatible with the
-ERC and VAD packages:
+Install the complete optional runtime in the isolated Parakeet environment
+described above, after installing the matching Torch packages:
 
 ```bash
-python -m pip install -r aimara/requirements-parakeet.txt
+python -m pip --isolated install --index-url https://pypi.org/simple \
+  -r aimara/requirements-parakeet.txt
 ```
 
-That file pins `nemo_toolkit[asr]==2.4.0`, matching ROB. Installation can change
-shared ML dependencies, so the existing `aimara_env` has not been modified.
+That file pins `nemo_toolkit[asr]==2.4.0`, matching ROB, together with the ERC
+runtime and compatible optional dependencies.
 Importing `aimara.rob` and running Whisper do not import or require NeMo.
 
 To select Parakeet, append these options to an existing runner command:
@@ -176,8 +262,9 @@ retried once with confidence disabled, then the decoding settings are restored.
 
 `tests/test_parakeet.py` and `tests/test_parakeet_cli.py` cover these adapters,
 optional loading, backend selection, and speaker-aware WAV/prediction output
-with model test doubles. Actual Parakeet/AmberNet inference has not been run:
-NeMo and their weights are absent from the current environment. Runtime,
+with model test doubles. NeMo's real imports now pass in the isolated Parakeet
+environment. Trained Parakeet/AmberNet inference has not been run because their
+weights are not cached. Runtime,
 transcript accuracy, and emotion accuracy still require evaluation. Batch
 `--resume` reruns results when the selected backend or its settings change.
 
@@ -415,7 +502,8 @@ python -m aimara.run_pipeline \
 
 The `LD_PRELOAD` prefix is currently needed in `aimara_env` because its OpenCV
 package otherwise resolves an incompatible bundled `libpng`. It can be removed
-once that environment's OpenCV/libpng installation is repaired.
+when using the validated isolated CPU profiles above, which import OpenCV
+without that workaround.
 
 The command writes segment WAV files under `audio/` and the aligned transcript,
 timing, emotion, confidence, and class probabilities to `predictions.json`.

@@ -56,6 +56,11 @@ The integration lives under [`aimara/`](aimara/). Its main components are:
 Detailed setup, commands, model locations, output formats, and the current
 OpenCV environment workaround are documented in
 [`aimara/README.md`](aimara/README.md).
+The integration now provides pinned Whisper and optional Parakeet runtime
+profiles, matching CPU/CUDA Torch packages, and an environment checker. See
+[isolated runtime setup](aimara/README.md#isolated-runtime-environments) for
+fresh installations; the validated CPU profiles run without the shared
+environment's OpenCV workaround.
 
 ### Current validation status
 

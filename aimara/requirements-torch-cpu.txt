@@ -1,0 +1,6 @@
+--index-url https://download.pytorch.org/whl/cpu
+-c constraints-runtime.txt
+torch==2.4.1+cpu
+torchvision==0.19.1+cpu
+torchaudio==2.4.1+cpu
+
