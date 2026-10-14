@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Union
 
@@ -19,10 +20,13 @@ class AIMARAPipeline:
         speech_processor: OfflineROBProcessor,
         feature_bridge: ERCFeatureBridge,
         emotion_model: ERCEmotionModel,
+        *,
+        resume_config: Mapping | None = None,
     ) -> None:
         self.speech_processor = speech_processor
         self.feature_bridge = feature_bridge
         self.emotion_model = emotion_model
+        self.resume_config = resume_config
 
     def process_video(
         self,

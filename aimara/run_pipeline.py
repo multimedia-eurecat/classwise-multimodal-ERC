@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
 from .erc_encoders import OriolAudioEncoder, OriolTextEncoder, OriolVisualEncoder
@@ -248,6 +249,109 @@ def build_parakeet_config(args: argparse.Namespace) -> ParakeetConfig:
     )
 
 
+def _encoder_resume_config(encoder) -> dict:
+    config = getattr(encoder, "config", None)
+    values = (
+        asdict(config) if is_dataclass(config) and not isinstance(config, type) else {}
+    )
+    # Local model references need artifact identity as well as their pathname.
+    for name in ("model_id", "asd_weights", "tddfa_onnx_path"):
+        value = values.get(name)
+        if isinstance(value, str) and value and Path(value).exists():
+            values[name] = Path(value)
+    revision = getattr(
+        getattr(getattr(encoder, "model", None), "config", None), "_commit_hash", None
+    )
+    values["model_revision"] = revision if isinstance(revision, str) else None
+    return values
+
+
+def build_resume_config(
+    args: argparse.Namespace,
+    *,
+    speech_config: ROBProcessorConfig,
+    speaker_config: SpeakerSegmentationConfig,
+    asr_config: WhisperInferenceConfig | ParakeetConfig,
+    transcriber,
+    feature_bridge: ERCFeatureBridge,
+    emotion_model: ERCEmotionModel,
+    profile: ERCModelProfile,
+    diarizer,
+) -> dict:
+    """Describe the selected pipeline, excluding output paths and inactive backends.
+
+    Artifact contents are inspected by run_batch once, after all loaders finish.
+    """
+    backend = getattr(args, "asr_backend", "whisper")
+    asr = {
+        "backend": backend,
+        "settings": asdict(asr_config),
+        "language": args.language,
+        "weights": args.asr_weights,
+    }
+    if backend == "whisper":
+        asr["model"] = args.asr_model
+    else:
+        for name in ("model_name", "language_id_model"):
+            value = asr["settings"][name]
+            if value and Path(value).exists():
+                asr["settings"][name] = Path(value)
+        asr["language_id_available"] = (
+            getattr(transcriber, "language_identifier", None) is not None
+        )
+    for name in ("device", "effective_compute_type"):
+        value = getattr(transcriber, name, None)
+        asr[name] = value if isinstance(value, str) else None
+
+    diarization = {"backend": getattr(args, "diarization_backend", "none")}
+    if diarizer is not None:
+        diarization.update(
+            {
+                "weights": args.diarization_weights,
+                "speaker_grouping": asdict(speaker_config),
+                "repository": ROBSpeakerDiarizer.DEFAULT_REPOSITORY,
+                "model": ROBSpeakerDiarizer.DEFAULT_MODEL_NAME,
+                "train_type": ROBSpeakerDiarizer.DEFAULT_TRAIN_TYPE,
+                "dataset": ROBSpeakerDiarizer.DEFAULT_DATASET,
+            }
+        )
+        for name in (
+            "min_embed_duration",
+            "min_create_duration",
+            "max_embed_duration",
+            "probe_duration",
+            "step_duration",
+            "change_threshold",
+        ):
+            value = getattr(diarizer, name, None)
+            diarization[name] = value if isinstance(value, (int, float)) else None
+
+    device = getattr(emotion_model, "device", None)
+    return {
+        "requested_device": args.device,
+        "asr": asr,
+        "vad": {
+            "settings": asdict(speech_config),
+            "weights": args.vad_weights,
+            "repository": ROBVoiceActivityDetector.DEFAULT_REPO_MODEL,
+            "model": ROBVoiceActivityDetector.DEFAULT_MODEL_NAME,
+        },
+        "diarization": diarization,
+        "erc": {
+            "checkpoint": args.checkpoint,
+            "profile": asdict(profile),
+            "device": device if isinstance(device, str) else None,
+            "unknown_speaker_policy": feature_bridge.unknown_speaker_policy,
+            "speaker_slots": feature_bridge.speaker_slots,
+            "unknown_speaker_id": feature_bridge.unknown_speaker_id,
+        },
+        "encoders": {
+            name: _encoder_resume_config(getattr(feature_bridge, f"{name}_encoder"))
+            for name in ("text", "audio", "visual")
+        },
+    }
+
+
 def build_pipeline(args: argparse.Namespace) -> AIMARAPipeline:
     config, speaker_config = build_segmentation_configs(args)
     asr_backend = getattr(args, "asr_backend", "whisper")
@@ -256,6 +360,7 @@ def build_pipeline(args: argparse.Namespace) -> AIMARAPipeline:
         ROBTranscriber.validate_model_size(args.asr_model)
     elif asr_backend == "parakeet":
         parakeet_config = build_parakeet_config(args)
+        asr_config = parakeet_config
     else:
         raise ValueError("asr_backend must be whisper or parakeet")
     diarization_backend = getattr(args, "diarization_backend", "none")
@@ -324,7 +429,20 @@ def build_pipeline(args: argparse.Namespace) -> AIMARAPipeline:
             args, "unknown_speaker_policy", "omit_embedding"
         ),
     )
-    return AIMARAPipeline(speech_processor, feature_bridge, emotion_model)
+    resume_config = build_resume_config(
+        args,
+        speech_config=config,
+        speaker_config=speaker_config,
+        asr_config=asr_config,
+        transcriber=transcriber,
+        feature_bridge=feature_bridge,
+        emotion_model=emotion_model,
+        profile=profile,
+        diarizer=speech_processor.diarizer,
+    )
+    return AIMARAPipeline(
+        speech_processor, feature_bridge, emotion_model, resume_config=resume_config
+    )
 
 
 def main() -> int:

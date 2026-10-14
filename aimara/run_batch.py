@@ -14,14 +14,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--video-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Reuse intact per-video predictions only when configuration and source match",
+    )
     add_runtime_arguments(parser)
     return parser
 
 
 def main() -> int:
     args = build_parser().parse_args()
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     pipeline = build_pipeline(args)
     rows, failures = run_batch(
         pipeline,

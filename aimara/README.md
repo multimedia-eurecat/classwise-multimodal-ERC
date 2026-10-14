@@ -102,8 +102,8 @@ videos; the ASR batch size controls chunks within each region.
 Faster-Whisper 1.2.1's batched decoder uses different prompt and temperature
 fallback behavior from its standard decoder. Changing batching, precision, or
 beam size can change transcripts and word boundaries; compare emotion accuracy
-as well as runtime. Use a fresh output directory for comparisons because batch
-resume does not yet check inference settings. `tests/test_rob_asr.py` and
+as well as runtime. Batch `--resume` reruns results when these settings change.
+`tests/test_rob_asr.py` and
 `tests/test_whisper_cli.py` cover options, CPU fallback, chunk coverage, timing
 retention, state reset after lazy failures, and both runner paths with test doubles.
 
@@ -178,8 +178,8 @@ retried once with confidence disabled, then the decoding settings are restored.
 optional loading, backend selection, and speaker-aware WAV/prediction output
 with model test doubles. Actual Parakeet/AmberNet inference has not been run:
 NeMo and their weights are absent from the current environment. Runtime,
-transcript accuracy, and emotion accuracy still require evaluation. Use a fresh
-output directory when changing backends because batch resume does not check it.
+transcript accuracy, and emotion accuracy still require evaluation. Batch
+`--resume` reruns results when the selected backend or its settings change.
 
 The models are composed by the offline processor, which writes a WAV for each
 returned `SpeechSegment`. With diarization disabled it returns one segment per
@@ -247,8 +247,8 @@ For either `aimara.run_pipeline` or `aimara.run_batch`, append:
 --diarization-backend redimnet2 --diarization-weights /tmp/aimara-redimnet2
 ```
 
-The default backend is `none`. Use a fresh output directory when switching
-diarization on: batch `--resume` does not check the speech configuration.
+The default backend is `none`. Batch `--resume` reruns results when switching
+diarization on or off.
 
 With diarization enabled, timed words are assigned to speakers by their overlap
 with that timeline. By default, whole sentences are labelled with their majority
@@ -318,8 +318,8 @@ To select the current ROB ASR configuration's 0.25-second silence gate and
 --pre-buffer-duration 0.5
 ```
 
-Use a fresh output directory when changing segmentation settings: batch resume
-does not yet check the configuration. `tests/test_segmentation_cli.py` verifies
+Batch `--resume` reruns results when active segmentation settings change.
+`tests/test_segmentation_cli.py` verifies
 both runners' defaults, runtime validation, changed VAD boundaries, and sentence
 versus word grouping through the offline processor, using model test doubles.
 
@@ -387,8 +387,8 @@ Both runners expose `--unknown-speaker-policy omit_embedding` (the default).
 For earlier runs' behavior, use `--unknown-speaker-policy reserve_slot` or pass
 `unknown_speaker_policy="reserve_slot"` to `ERCFeatureBridge`. That policy
 reserves slot zero for UNKNOWN and accepts at most one known voice alongside it.
-Use a fresh output directory when changing this policy: batch resume does not
-check it. Omitting unknown embeddings changes predictions for unresolved turns;
+Batch `--resume` reruns results when this policy changes.
+Omitting unknown embeddings changes predictions for unresolved turns;
 emotion accuracy still needs evaluation. The selected checkpoint must have the
 same text, audio, visual, and speaker dimensions as the loaded encoders.
 
@@ -476,8 +476,8 @@ The offline processor carries `Transcript.metadata` into each segment's
 `tests/test_speech_metadata.py` covers score availability, evidence coverage,
 ASR-input references, and JSON/CSV export through the pipeline. Adapter tests
 also cover language provenance and Parakeet's reported confidence and retry.
-Older cached predictions can lack these fields; use a fresh output directory to
-generate them, since resume still reuses old results without checking the schema.
+Older cached predictions can lack these fields. Batch `--resume` reruns legacy
+results without a compatible resume manifest or prediction schema.
 
 ## Batch evaluation
 
@@ -502,8 +502,40 @@ python -m aimara.run_batch \
 
 Detach with `Ctrl+B`, then `D`, and reconnect with
 `tmux attach -t aimara-eval`. Add `--resume` when restarting an interrupted
-run. A valid per-video `predictions.json` is reused; incomplete or malformed
-results are rerun.
+run. Each successful video receives a `resume_manifest.json` alongside its
+`predictions.json`. Results are reused only when the manifest version, pipeline
+configuration, source video identity, prediction checksum, and prediction schema
+match. Missing, legacy, incompatible, or damaged caches are rerun automatically.
+Valid empty predictions (videos without detected speech) can also be reused.
+
+The configuration covers the active ASR backend/model/language and inference
+settings, effective ASR device/precision, VAD settings, enabled diarization and
+speaker grouping, UNKNOWN policy, ERC profile/checkpoint/device, and loaded
+text/audio/visual encoder configurations and available model revision IDs.
+Output locations, `--resume`, and options for inactive backends do not affect it.
+Changing settings in the same output directory replaces that video's results;
+use separate output directories to retain comparison runs.
+
+Explicit checkpoint files, including local `.nemo` files, use SHA-256 content
+identities. Model cache directories use file names, sizes, and modification times
+to avoid reading every large weight file; lock files, download temporaries, and
+Python bytecode are ignored. Source videos use their resolved path, size, and
+modification time. These checks do not detect edits to videos or directory-cached
+weights that preserve both size and modification time, or an upstream model
+changing under the same ID without a recorded revision or local cache change.
+Identities are captured once after model loading; keep inputs and weights stable
+during a batch. Runtime library/code changes are not automatically fingerprinted.
+
+Manifests are written atomically only after successful predictions. A failed
+rerun removes its old manifest so a later resume retries that video, while other
+successful videos remain reusable. `tests/test_batch.py` and
+`tests/test_batch_resume_config.py` cover reuse, configuration changes, checkpoint
+replacement, input changes, legacy/corrupt caches, empty outputs, and recovery.
+
+For a custom Python pipeline, supply `AIMARAPipeline(..., resume_config=...)` or
+`run_batch(..., run_config=...)` with all settings that affect its predictions.
+Use `Path` values for model artifacts to include their identities. Without a
+configuration, batch processing still works but resume reruns cached videos.
 
 The output root contains combined `predictions.csv`, `predictions.json`, and
 `failures.json` files. Each video also receives its own directory containing
