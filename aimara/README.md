@@ -64,6 +64,49 @@ Segment boundaries are retained even when a backend returns no word timings.
 With diarization enabled, the offline processor groups these timings by speaker
 and produces separate ERC inputs for speaker changes within a VAD region.
 
+Both runners expose the Whisper inference controls below. Existing runs keep
+single-region decoding and the previous CPU fallback unless options are changed:
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `--asr-compute-type` | `float16` | Requested CTranslate2 model precision. |
+| `--asr-cpu-compute-type` | `int8` | CPU fallback when `float16` or `int8_float16` is requested; `float32` selects ROB's CPU fallback policy. |
+| `--asr-batched-inference` / `--no-asr-batched-inference` | disabled | Enable Faster-Whisper's batched decoder. |
+| `--asr-batch-size` | `16` | Maximum chunks decoded together within one VAD region when batching is enabled. |
+| `--asr-beam-size` | `5` | Beam search size for either decoder. |
+
+To select ROB's batched inference and CPU fallback settings, append:
+
+```bash
+--asr-compute-type float16 \
+--asr-cpu-compute-type float32 \
+--asr-batched-inference \
+--asr-batch-size 16
+```
+
+The loader also accepts `cpu_compute_type`, `use_batched_inference`, `batch_size`,
+and `beam_size` as keyword arguments. It logs the selected device, effective
+compute-type argument, and decoding settings; the returned transcriber exposes
+`inference_config`, `device`, and `effective_compute_type`. Unsupported requested
+precision still gets the existing float32 retry. Invalid options fail before
+model loading.
+
+Both decoders keep word timestamps enabled and internal VAD disabled. Batched
+decoding supplies contiguous input-relative clips of at most 30 seconds,
+covering the full VAD region, including onset pre-buffer and longer configured
+regions. This avoids Faster-Whisper 1.2.1 rejecting an input of at least 30 seconds
+or truncating an oversized explicit clip. Alignment state resets between regions
+and videos, including after decoder failures. Models remain loaded across batch
+videos; the ASR batch size controls chunks within each region.
+
+Faster-Whisper 1.2.1's batched decoder uses different prompt and temperature
+fallback behavior from its standard decoder. Changing batching, precision, or
+beam size can change transcripts and word boundaries; compare emotion accuracy
+as well as runtime. Use a fresh output directory for comparisons because batch
+resume does not yet check inference settings. `tests/test_rob_asr.py` and
+`tests/test_whisper_cli.py` cover options, CPU fallback, chunk coverage, timing
+retention, state reset after lazy failures, and both runner paths with test doubles.
+
 The models are composed by the offline processor, which writes a WAV for each
 returned `SpeechSegment`. With diarization disabled it returns one segment per
 VAD region; with diarization enabled a region can yield several speaker groups:

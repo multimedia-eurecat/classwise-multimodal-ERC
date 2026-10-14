@@ -11,7 +11,13 @@ from .erc_features import ERCFeatureBridge
 from .erc_model import ERCEmotionModel, ERCModelProfile
 from .offline_processor import OfflineROBProcessor
 from .pipeline import AIMARAPipeline
-from .rob import ROBSpeakerDiarizer, ROBTranscriber, ROBVoiceActivityDetector
+from .rob import (
+    ROBSpeakerDiarizer,
+    ROBTranscriber,
+    ROBVoiceActivityDetector,
+    WhisperInferenceConfig,
+)
+from .rob.asr import WHISPER_COMPUTE_TYPES
 from .speaker_segmentation import SpeakerSegmentationConfig, SpeakerSegmenter
 from .speech_interfaces import ROBProcessorConfig
 from .vad_processing import OfflineVADProcessor
@@ -39,6 +45,39 @@ def add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--language", default="en")
     parser.add_argument("--device", choices=("cpu", "cuda"), default=None)
+
+    asr_defaults = WhisperInferenceConfig()
+    asr = parser.add_argument_group("Whisper inference")
+    asr.add_argument(
+        "--asr-compute-type",
+        choices=WHISPER_COMPUTE_TYPES,
+        default=asr_defaults.compute_type,
+        help="Requested CTranslate2 precision (default: %(default)s)",
+    )
+    asr.add_argument(
+        "--asr-cpu-compute-type",
+        choices=("int8", "float32"),
+        default=asr_defaults.cpu_compute_type,
+        help="CPU fallback for float16 and int8_float16 (default: %(default)s)",
+    )
+    asr.add_argument(
+        "--asr-batched-inference",
+        action=argparse.BooleanOptionalAction,
+        default=asr_defaults.use_batched_inference,
+        help="Decode chunks within each VAD region in batches",
+    )
+    asr.add_argument(
+        "--asr-batch-size",
+        type=int,
+        default=asr_defaults.batch_size,
+        help="Maximum Whisper chunks decoded together when batching is enabled (default: %(default)s)",
+    )
+    asr.add_argument(
+        "--asr-beam-size",
+        type=int,
+        default=asr_defaults.beam_size,
+        help="Whisper beam search size (default: %(default)s)",
+    )
 
     defaults = ROBProcessorConfig()
     speech = parser.add_argument_group("VAD segmentation")
@@ -133,8 +172,25 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def build_asr_config(args: argparse.Namespace) -> WhisperInferenceConfig:
+    defaults = WhisperInferenceConfig()
+    return WhisperInferenceConfig(
+        compute_type=getattr(args, "asr_compute_type", defaults.compute_type),
+        cpu_compute_type=getattr(
+            args, "asr_cpu_compute_type", defaults.cpu_compute_type
+        ),
+        use_batched_inference=getattr(
+            args, "asr_batched_inference", defaults.use_batched_inference
+        ),
+        batch_size=getattr(args, "asr_batch_size", defaults.batch_size),
+        beam_size=getattr(args, "asr_beam_size", defaults.beam_size),
+    )
+
+
 def build_pipeline(args: argparse.Namespace) -> AIMARAPipeline:
     config, speaker_config = build_segmentation_configs(args)
+    asr_config = build_asr_config(args)
+    ROBTranscriber.validate_model_size(args.asr_model)
     diarization_backend = getattr(args, "diarization_backend", "none")
     diarization_weights = getattr(args, "diarization_weights", None)
     if diarization_backend == "redimnet2" and diarization_weights is None:
@@ -154,6 +210,11 @@ def build_pipeline(args: argparse.Namespace) -> AIMARAPipeline:
         weights_dir=args.asr_weights,
         language=args.language,
         device=args.device,
+        compute_type=asr_config.compute_type,
+        cpu_compute_type=asr_config.cpu_compute_type,
+        use_batched_inference=asr_config.use_batched_inference,
+        batch_size=asr_config.batch_size,
+        beam_size=asr_config.beam_size,
     )
     speech_processor = OfflineROBProcessor(
         vad_processor=OfflineVADProcessor(vad, config),
