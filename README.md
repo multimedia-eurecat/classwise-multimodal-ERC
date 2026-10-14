@@ -72,9 +72,11 @@ its fixtures, reports and completion criteria.
 - A batch run processed all 10 clean `selfie-videos` without pipeline failures.
 - Per-video and combined JSON/CSV outputs preserve VAD timing, transcripts,
   emotion predictions, confidence values, and class probabilities.
-- The automated suite currently contains 202 passing tests covering contracts,
+- The automated suite currently contains 210 passing tests covering contracts,
   VAD/ASR adapters, segmentation, feature alignment, checkpoint validation,
-  orchestration, failure handling, and resume behavior.
+  orchestration, failure handling, resume behavior, and quality metrics.
+- Reference scoring and configuration comparisons on the ten clean clips are
+  documented in [step 12C](aimara/README.md#reference-quality-and-performance-step-12c).
 
 The synthetic run is an integration stability check, not evidence that ROB
 improves ERC accuracy. The selected IEMOCAP checkpoint exposes six classes
@@ -84,8 +86,9 @@ directly predict synthetic labels such as `fear`, `disgust`, or `surprise`.
 ### Known limitations
 
 - Optional ReDimNet2 diarization and Parakeet/AmberNet passed pretrained smoke
-  runs on CPU and CUDA. Attribution/transcript/emotion accuracy and comparative
-  runtime still need evaluation. Unresolved turns retain `UNKNOWN` and omit
+  runs on CPU and CUDA. The small annotated set exposes unresolved speaker turns
+  and configuration-dependent emotion accuracy; broader target-domain validation
+  remains necessary. Unresolved turns retain `UNKNOWN` and omit
   speaker embeddings by default.
 - Processing is offline and video-oriented. ROB integration will require a thin
   in-memory or ROS-facing adapter around finalized speech segments.

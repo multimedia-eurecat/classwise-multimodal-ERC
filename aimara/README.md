@@ -264,8 +264,8 @@ retried once with confidence disabled, then the decoding settings are restored.
 `tests/test_parakeet.py` and `tests/test_parakeet_cli.py` cover these adapters,
 optional loading, backend selection, and speaker-aware WAV/prediction output
 with model test doubles. Step 12B also exercised trained Parakeet and AmberNet
-on CPU and CUDA with the real feature encoders and ERC checkpoint. Comparative
-runtime, transcript accuracy, and emotion accuracy remain step 12C work. Batch
+on CPU and CUDA with the real feature encoders and ERC checkpoint. Step 12C below
+reports comparative runtime, transcript accuracy, and emotion accuracy. Batch
 `--resume` reruns results when the selected backend or its settings change.
 
 The models are composed by the offline processor, which writes a WAV for each
@@ -476,8 +476,9 @@ For earlier runs' behavior, use `--unknown-speaker-policy reserve_slot` or pass
 reserves slot zero for UNKNOWN and accepts at most one known voice alongside it.
 Batch `--resume` reruns results when this policy changes.
 Omitting unknown embeddings changes predictions for unresolved turns;
-emotion accuracy still needs evaluation. The selected checkpoint must have the
-same text, audio, visual, and speaker dimensions as the loaded encoders.
+step 12C reports a small paired comparison of these policies. The selected
+checkpoint must have the same text, audio, visual, and speaker dimensions as
+the loaded encoders.
 
 `tests/test_erc_speaker_policy.py` runs the real ERC transformer with a small test
 checkpoint. It checks zero unknown embeddings across all nine transformer paths,
@@ -769,10 +770,160 @@ turn and recognize A → B → A up to an identity-label permutation. These qual
 diagnostics are reported independently from smoke gates. Short middle turns
 can remain UNKNOWN, and some turns can share an identity. The final corrected
 runs recovered the annotated A → B → A pattern in four of ten clips in both
-diarization configurations. Step 12C must quantify those attribution errors
+diarization configurations. Step 12C below quantifies those attribution errors
 along with transcript/emotion accuracy and runtime. This set covers
 English clips and the tested hardware; other languages, noise conditions and
 hardware still need their own validation.
+
+## Reference quality and performance: step 12C
+
+`evaluate_quality` scores completed pretrained smoke reports against the existing
+`selfie-videos.csv` annotations. It loads no models and changes neither annotations
+nor predictions. Source-video and annotation checksums must agree across reports;
+failed, incomplete, duplicate or mismatched input reports are rejected. Every
+pair of configurations is compared on its shared videos, so a three-video CPU
+run or four-video policy comparison cannot silently compete with a ten-video run.
+
+```bash
+python -m aimara.evaluate_quality \
+  --reference-csv /home/Imatge/media/ssd2/AIMARA/input_csv/selfie-videos.csv \
+  --smoke-report /tmp/aimara-12c/whisper-redimnet2-cuda/smoke_report.json \
+  --smoke-report /tmp/aimara-12b-v2/parakeet-redimnet2-cuda/smoke_report.json \
+  --report /tmp/aimara-quality-report.json
+```
+
+Methods and scoring scope:
+
+- ASR: micro word error rate over chronological raw ASR calls. Text is Unicode
+  normalized and casefolded; punctuation is removed and internal apostrophes
+  retained. Exported transcripts are scored separately to expose words lost
+  during speaker grouping. Reference utterance boundaries supply no word-level
+  alignment, so this evaluation makes no word-timestamp accuracy claim.
+- Speakers: optimal one-to-one identity mapping per video, with separate correct,
+  uncovered, UNKNOWN and confused seconds. Both raw diarization and exported
+  segments are scored. The annotations span whole turns including pauses; these
+  duration scores are not standard speech-masked DER. Change points use
+  one-to-one matching within 0.5 seconds, including changes to/from UNKNOWN.
+- Emotion: duration-weighted mean segment probabilities within each reference
+  turn, followed by argmax. Entirely uncovered turns count as incorrect, and
+  partial coverage is recorded per turn. Accuracy and confusion counts use
+  supported reference labels; macro F1 averages their six present classes.
+  Scoring uses annotations only after inference, with no ground-truth segments
+  or transcripts fed to the model.
+
+The default emotion map accepts the six checkpoint labels plus `anger→angry`
+and `sadness→sad`. It excludes `joy`, `fear`, `disgust` and `surprise`: the
+reference taxonomy has no exact checkpoint equivalent for them. Of the 31
+annotated turns, 20 are scorable; the 11 excluded turns are 3 joy, 3 fear,
+2 disgust and 3 surprise. An explicit `--emotion-map /path/to/map.json` replaces
+this policy; all mapping targets must be valid checkpoint labels. The model
+still emits its usual six labels for excluded turns.
+
+Measured reference results on all ten clips (default settings unless stated):
+
+| Configuration | Raw ASR WER | Exported speaker duration correct | Emotion accuracy | Macro F1 |
+|---|---:|---:|---:|---:|
+| Whisper CPU, diarization disabled | 2.30% | — | 60% | 54.52% |
+| Whisper + ReDimNet2 CPU | 2.30% | 68.50% | 75% | 69.44% |
+| Whisper CUDA, diarization disabled | 1.84% | — | 60% | 54.52% |
+| Whisper + ReDimNet2 CUDA | 1.84% | 68.64% | 70% | 62.30% |
+| Parakeet + AmberNet + ReDimNet2 CUDA | 0.92% | 71.29% | 60% | 51.98% |
+| Whisper + ReDimNet2 CUDA, raw word splits | 1.84% | 70.47% | 55% | 49.15% |
+| Whisper + ReDimNet2 CUDA, minimum run 1 token / 0 seconds | 1.84% | 66.71% | 65% | 59.42% |
+| Whisper + ReDimNet2 CUDA, batched ASR | 1.84% | 68.65% | 70% | 62.30% |
+
+Exported transcript WER equals raw ASR WER in these runs. CUDA Whisper and
+Parakeet have identical raw speaker timelines: 69.60% correct duration,
+10.472 uncovered seconds, 7.140 UNKNOWN seconds, and 6.708 confused seconds
+over 80 annotated seconds. Their word/sentence grouping produces different
+exported speaker scores. Whisper recovers 13 of 21 exported speaker changes
+within 0.5 seconds; Parakeet recovers 15. Boundary precision is 92.86% and 93.75%
+respectively. Pauses contribute to uncovered time because the reference spans
+are turn annotations, not a speech activity mask.
+
+The reserved-UNKNOWN-slot comparison uses only Anger, Disgust, Joy and Surprise,
+whose baseline outputs require at most one known speaker plus UNKNOWN. Across
+their five scorable emotion turns, `omit_embedding` gets 3/5 correct and
+`reserve_slot` gets 4/5. This is a small diagnostic: reserving a slot still
+cannot represent two known voices plus UNKNOWN. The selected `omit_embedding`
+default remains appropriate for that capacity requirement; this comparison
+does not establish an accuracy advantage for it.
+
+These observations support retaining sentence snapping and the existing
+minimum-run settings for now. Parakeet's lower transcript WER does not translate
+into higher ERC accuracy on this set. CPU/CUDA feature precision also changes
+some emotion decisions; comparisons must retain their recorded environment.
+No runtime defaults or model weights were changed by this validation.
+
+For controlled timings, `benchmark_pipeline` rebuilds one passed configuration
+in a fresh process. Use a fresh output directory, local model caches and the
+same isolated environment as the source report. Run configurations sequentially
+with fixed thread counts; CUDA runs additionally need the driver/library setup
+described above. CPU measurements use the CPU-only profiles; encoders normally
+choose devices from Torch availability, so a CPU benchmark rejects an accidental
+mix with CUDA encoders rather than describing it as a CPU-only measurement.
+
+```bash
+OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 python -m aimara.benchmark_pipeline \
+  --smoke-report /tmp/aimara-12c/whisper-redimnet2-cuda/smoke_report.json \
+  --video Anger.mp4 --video Neutral.mp4 --repeat 2 \
+  --output-dir /tmp/aimara-benchmark-whisper
+```
+
+The Linux benchmark records model construction time, one excluded warmup per
+clip, then sequential round-robin repeats with CUDA synchronization. Timed
+inference includes audio/video decoding, neural models and WAV/JSON writes;
+validation and checksum hashing run outside the timer. Outputs must remain
+stable against warmup within the smoke probability tolerance. The report saves
+individual samples and computes real-time factor as total processing seconds
+divided by total audio seconds. Model construction includes lazy imports and
+loader-internal warmups, with warm disk caches; it excludes initial CLI imports
+and first-use model downloads.
+
+Memory measurements cover startup and inference: parent-process peak RSS
+(`ru_maxrss`), sampled RSS, sampled driver-level GPU memory including
+CTranslate2, and separate Torch allocator peaks. GPU sampling waits 250 ms
+between queries and can miss brief spikes. FFmpeg child-process RSS is excluded.
+Memory sampling errors fail the benchmark instead of reporting missing memory
+as zero. Each run records package versions, model hashes, source identity,
+configuration, CPU affinity, thread settings and GPU properties.
+
+Sequential measurements used Anger and Neutral (eight seconds each), one warmup
+per clip and two measured repeats per clip, four CPU threads, an i7-5820K host,
+and the same physical GTX 1080 Ti for every CUDA configuration:
+
+| Configuration | Model construction | Warm median per video | Real-time factor | Peak parent RSS | Sampled GPU peak |
+|---|---:|---:|---:|---:|---:|
+| Whisper CPU | 8.96 s | 16.18 s | 2.019 | 5.19 GiB | — |
+| Parakeet + AmberNet CPU | 35.38 s | 16.51 s | 2.063 | 7.85 GiB | — |
+| Whisper CUDA, diarization disabled | 10.84 s | 7.18 s | 0.897 | 5.17 GiB | 2.50 GiB |
+| Whisper + ReDimNet2 CUDA | 11.18 s | 9.57 s | 1.200 | 5.17 GiB | 2.59 GiB |
+| Whisper + ReDimNet2 CUDA, batched ASR | 11.26 s | 9.44 s | 1.181 | 5.17 GiB | 2.65 GiB |
+| Parakeet + AmberNet + ReDimNet2 CUDA | 37.96 s | 9.70 s | 1.207 | 6.26 GiB | 5.25 GiB |
+
+Real-time factor below 1 means total processing was faster than the input audio
+duration in this offline benchmark; it is not a streaming latency measurement.
+The small batched timing difference is insufficient to establish a throughput
+advantage. The host was shared; runs were sequential for this validation but
+hardware was not exclusively reserved.
+
+All six benchmarks passed, including stable output checks for 24 measured
+samples after 12 warmup calls. Reference scoring covers 87 video/configuration
+observations, including 44 new ablation runs. The final acceptance suite passed
+210 tests with zero skips in each of the CPU Whisper, CPU Parakeet and CUDA
+profiles. Metric tests cover known word-error counts, identity permutation,
+UNKNOWN/missing attribution, competing boundary matches, duration-weighted
+emotion scoring, excluded labels and provenance failures.
+
+The versioned [quality/performance receipt](quality_results.json) preserves
+compact metrics and detailed-report checksums. Detailed outputs live under
+`/tmp/aimara-12c/`, with earlier baseline observations under `/tmp/aimara-12b-v2/`.
+The checks establish completed measurements, not a production accuracy gate.
+This ten-clip English synthetic set cannot establish general accuracy, language
+ID calibration, robustness to noise, or deployment latency on other hardware.
+Its eight-second clips also do not establish batching throughput on long speech.
+A separate held-out target-domain set and agreed quality thresholds are needed
+before selecting production defaults.
 
 The output root contains combined `predictions.csv`, `predictions.json`, and
 `failures.json` files. Each video also receives its own directory containing

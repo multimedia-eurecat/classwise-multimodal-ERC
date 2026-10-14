@@ -1,0 +1,2150 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-14",
+  "validation_kind": "reference_quality_and_performance",
+  "evaluator_sha256": "7497f0ff1812d114d14e94f14438ca05c7e44211d23d427ede76b6b1825f35e2",
+  "detailed_quality_report_sha256": "7cfd51fa0ba8fd6e76717470880431453d4ba5edf1bfa0d9af9405d2ef37a2f3",
+  "reference_sha256": "9acebe3b4ddebd94fb60cc309aef49a1c5e88b50fe5b29d5002e6b915bd1ac35",
+  "reference_video_count": 10,
+  "reference_turn_count": 31,
+  "emotion_scored_turn_count": 20,
+  "emotion_mapping": {
+    "happy": "happy",
+    "sad": "sad",
+    "neutral": "neutral",
+    "angry": "angry",
+    "excited": "excited",
+    "frustrated": "frustrated",
+    "anger": "angry",
+    "sadness": "sad"
+  },
+  "excluded_emotions": {
+    "disgust": 2,
+    "fear": 3,
+    "joy": 3,
+    "surprise": 3
+  },
+  "boundary_tolerance_seconds": 0.5,
+  "methods": {
+    "asr": "Micro WER over chronological raw ASR calls; Unicode casefold, punctuation removal, internal apostrophes retained",
+    "speakers": "Optimal one-to-one identity mapping per video; duration on annotated turn spans, including pauses; UNKNOWN never mapped; not standard DER",
+    "boundaries": "One-to-one speaker change matching; next interval start; UNKNOWN changes included; no word-level timestamp ground truth",
+    "emotion": "Duration-weighted mean segment probabilities per annotated turn; uncovered turns are errors; unmapped labels excluded; macro F1 over reference-supported classes",
+    "comparisons": "Only shared videos, verified source and reference checksums; observational ablations on a small set, not held-out tuning"
+  },
+  "scope": {
+    "data": "Ten clean English synthetic selfie videos; annotations span whole turns including pauses",
+    "quality_thresholds": null,
+    "production_accuracy_gate_passed": null,
+    "configuration_changes": "None; measurements retain runtime defaults",
+    "quality_observations": 87,
+    "new_configuration_observations": 44,
+    "benchmark_videos": [
+      "Anger.mp4",
+      "Neutral.mp4"
+    ],
+    "benchmark_measured_repeats_per_video": 2,
+    "benchmark_measured_samples": 24,
+    "benchmark_warmup_calls": 12,
+    "hardware_cpu": "Intel Core i7-5820K @ 3.30GHz; 12 logical CPUs available",
+    "hardware_gpu": "NVIDIA GeForce GTX 1080 Ti, physical GPU 1; CUDA 12.1",
+    "omp_num_threads": 4,
+    "mkl_num_threads": 4,
+    "benchmark_control": "One pipeline configuration at a time; fresh processes, local warm model caches, no resume; shared host, not an exclusive hardware reservation",
+    "benchmark_memory": "Parent RSS includes import/startup peaks, FFmpeg child RSS excluded; sampled GPU peaks can miss transient allocations",
+    "limitations": [
+      "No held-out tuning or representative production sample",
+      "No word-level timestamp ground truth",
+      "No speech-masked DER or overlap/collar evaluation",
+      "No language-ID calibration or multilingual/noise validation",
+      "Two measured repeats per clip, not tail-latency characterization"
+    ]
+  },
+  "quality_runs": [
+    {
+      "name": "parakeet-cpu",
+      "settings": {
+        "asr_backend": "parakeet",
+        "asr_model": "tiny.en",
+        "device": "cpu",
+        "diarization_backend": "none",
+        "unknown_speaker_policy": "omit_embedding",
+        "snap_splits_to_sentences": true,
+        "min_speaker_run_tokens": 2,
+        "min_speaker_run_duration": 0.4,
+        "asr_batched_inference": false,
+        "asr_batch_size": 16,
+        "asr_beam_size": 5,
+        "parakeet_model": "nvidia/parakeet-tdt-0.6b-v3",
+        "language": "auto"
+      },
+      "source_report_sha256": "24b24358f16a9d6e720244f8f05e6f99deb180a4a861ff1870e2b423a862dc8d",
+      "video_files": [
+        "Anger.mp4",
+        "Happy.mp4",
+        "Neutral.mp4"
+      ],
+      "effective_asr_compute_type": "float32",
+      "summary": {
+        "video_count": 3,
+        "segment_count": 6,
+        "asr": {
+          "reference_words": 63,
+          "hypothesis_words": 62,
+          "errors": 2,
+          "substitutions": 1,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.031746031746031744
+        },
+        "exported_transcript": {
+          "reference_words": 63,
+          "hypothesis_words": 62,
+          "errors": 2,
+          "substitutions": 1,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.031746031746031744
+        },
+        "timeline_speakers": {
+          "reference_seconds": 24.0,
+          "correct_seconds": 0.0,
+          "uncovered_seconds": 24.0,
+          "unknown_seconds": 0,
+          "confusion_seconds": 0.0,
+          "accuracy": 0.0
+        },
+        "exported_speakers": {
+          "reference_seconds": 24.0,
+          "correct_seconds": 0.0,
+          "uncovered_seconds": 3.5520000000000005,
+          "unknown_seconds": 20.448,
+          "confusion_seconds": 0.0,
+          "accuracy": 0.0
+        },
+        "timeline_boundaries": {
+          "reference_boundaries": 6,
+          "predicted_boundaries": 0,
+          "matched": 0,
+          "precision": null,
+          "recall": 0.0,
+          "mean_absolute_error_seconds": null
+        },
+        "exported_boundaries": {
+          "reference_boundaries": 6,
+          "predicted_boundaries": 0,
+          "matched": 0,
+          "precision": null,
+          "recall": 0.0,
+          "mean_absolute_error_seconds": null
+        },
+        "emotion": {
+          "scored_turns": 9,
+          "correct_turns": 5,
+          "accuracy": 0.5555555555555556,
+          "macro_f1": 0.5523809523809523,
+          "macro_f1_classes": [
+            "angry",
+            "happy",
+            "neutral"
+          ],
+          "per_class": {
+            "angry": {
+              "support": 2,
+              "f1": 0.8,
+              "recall": 1.0
+            },
+            "happy": {
+              "support": 3,
+              "f1": 0.0,
+              "recall": 0.0
+            },
+            "neutral": {
+              "support": 4,
+              "f1": 0.8571428571428571,
+              "recall": 0.75
+            }
+          },
+          "confusion": {
+            "angry": {
+              "angry": 2
+            },
+            "happy": {
+              "excited": 3
+            },
+            "neutral": {
+              "angry": 1,
+              "neutral": 3
+            }
+          },
+          "excluded_labels": {},
+          "missing_predictions": 0
+        }
+      }
+    },
+    {
+      "name": "parakeet-redimnet2-cuda",
+      "settings": {
+        "asr_backend": "parakeet",
+        "asr_model": "tiny.en",
+        "device": "cuda",
+        "diarization_backend": "redimnet2",
+        "unknown_speaker_policy": "omit_embedding",
+        "snap_splits_to_sentences": true,
+        "min_speaker_run_tokens": 2,
+        "min_speaker_run_duration": 0.4,
+        "asr_batched_inference": false,
+        "asr_batch_size": 16,
+        "asr_beam_size": 5,
+        "parakeet_model": "nvidia/parakeet-tdt-0.6b-v3",
+        "language": "auto"
+      },
+      "source_report_sha256": "fd9b6db86ea6332ec4b9cdb7f785638b83c8642fd611b50155849188b24f8a3d",
+      "video_files": [
+        "Anger.mp4",
+        "Disgust.mp4",
+        "Excited.mp4",
+        "Fear.mp4",
+        "Frustrated.mp4",
+        "Happy.mp4",
+        "Joy.mp4",
+        "Neutral.mp4",
+        "Sadness.mp4",
+        "Surprise.mp4"
+      ],
+      "effective_asr_compute_type": "float32",
+      "summary": {
+        "video_count": 10,
+        "segment_count": 27,
+        "asr": {
+          "reference_words": 217,
+          "hypothesis_words": 216,
+          "errors": 2,
+          "substitutions": 1,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.009216589861751152
+        },
+        "exported_transcript": {
+          "reference_words": 217,
+          "hypothesis_words": 216,
+          "errors": 2,
+          "substitutions": 1,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.009216589861751152
+        },
+        "timeline_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 55.68,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 7.140000000000001,
+          "confusion_seconds": 6.708,
+          "accuracy": 0.696
+        },
+        "exported_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 57.028000000000006,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 5.6000000000000005,
+          "confusion_seconds": 6.8999999999999995,
+          "accuracy": 0.7128500000000001
+        },
+        "timeline_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 19,
+          "matched": 14,
+          "precision": 0.7368421052631579,
+          "recall": 0.6666666666666666,
+          "mean_absolute_error_seconds": 0.14728571428571427
+        },
+        "exported_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 16,
+          "matched": 15,
+          "precision": 0.9375,
+          "recall": 0.7142857142857143,
+          "mean_absolute_error_seconds": 0.14133333333333323
+        },
+        "emotion": {
+          "scored_turns": 20,
+          "correct_turns": 12,
+          "accuracy": 0.6,
+          "macro_f1": 0.5198412698412699,
+          "macro_f1_classes": [
+            "angry",
+            "excited",
+            "frustrated",
+            "happy",
+            "neutral",
+            "sad"
+          ],
+          "per_class": {
+            "angry": {
+              "support": 2,
+              "f1": 0.5714285714285714,
+              "recall": 1.0
+            },
+            "excited": {
+              "support": 3,
+              "f1": 0.6666666666666666,
+              "recall": 1.0
+            },
+            "frustrated": {
+              "support": 2,
+              "f1": 0.6666666666666666,
+              "recall": 0.5
+            },
+            "happy": {
+              "support": 3,
+              "f1": 0.0,
+              "recall": 0.0
+            },
+            "neutral": {
+              "support": 7,
+              "f1": 0.7142857142857143,
+              "recall": 0.7142857142857143
+            },
+            "sad": {
+              "support": 3,
+              "f1": 0.5,
+              "recall": 0.3333333333333333
+            }
+          },
+          "confusion": {
+            "angry": {
+              "angry": 2
+            },
+            "excited": {
+              "excited": 3
+            },
+            "frustrated": {
+              "angry": 1,
+              "frustrated": 1
+            },
+            "happy": {
+              "excited": 3
+            },
+            "neutral": {
+              "angry": 2,
+              "neutral": 5
+            },
+            "sad": {
+              "neutral": 2,
+              "sad": 1
+            }
+          },
+          "excluded_labels": {
+            "disgust": 2,
+            "fear": 3,
+            "joy": 3,
+            "surprise": 3
+          },
+          "missing_predictions": 0
+        }
+      }
+    },
+    {
+      "name": "whisper-cpu",
+      "settings": {
+        "asr_backend": "whisper",
+        "asr_model": "tiny.en",
+        "device": "cpu",
+        "diarization_backend": "none",
+        "unknown_speaker_policy": "omit_embedding",
+        "snap_splits_to_sentences": true,
+        "min_speaker_run_tokens": 2,
+        "min_speaker_run_duration": 0.4,
+        "asr_batched_inference": false,
+        "asr_batch_size": 16,
+        "asr_beam_size": 5,
+        "parakeet_model": "nvidia/parakeet-tdt-0.6b-v3",
+        "language": "en"
+      },
+      "source_report_sha256": "280118fc54b74551c4009b714b448e2daa982f0e1a30bca370303825398095db",
+      "video_files": [
+        "Anger.mp4",
+        "Disgust.mp4",
+        "Excited.mp4",
+        "Fear.mp4",
+        "Frustrated.mp4",
+        "Happy.mp4",
+        "Joy.mp4",
+        "Neutral.mp4",
+        "Sadness.mp4",
+        "Surprise.mp4"
+      ],
+      "effective_asr_compute_type": "int8",
+      "summary": {
+        "video_count": 10,
+        "segment_count": 20,
+        "asr": {
+          "reference_words": 217,
+          "hypothesis_words": 217,
+          "errors": 5,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 1,
+          "wer": 0.02304147465437788
+        },
+        "exported_transcript": {
+          "reference_words": 217,
+          "hypothesis_words": 217,
+          "errors": 5,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 1,
+          "wer": 0.02304147465437788
+        },
+        "timeline_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 0.0,
+          "uncovered_seconds": 80.0,
+          "unknown_seconds": 0,
+          "confusion_seconds": 0.0,
+          "accuracy": 0.0
+        },
+        "exported_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 0.0,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 69.52799999999999,
+          "confusion_seconds": 0.0,
+          "accuracy": 0.0
+        },
+        "timeline_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 0,
+          "matched": 0,
+          "precision": null,
+          "recall": 0.0,
+          "mean_absolute_error_seconds": null
+        },
+        "exported_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 0,
+          "matched": 0,
+          "precision": null,
+          "recall": 0.0,
+          "mean_absolute_error_seconds": null
+        },
+        "emotion": {
+          "scored_turns": 20,
+          "correct_turns": 12,
+          "accuracy": 0.6,
+          "macro_f1": 0.5452380952380952,
+          "macro_f1_classes": [
+            "angry",
+            "excited",
+            "frustrated",
+            "happy",
+            "neutral",
+            "sad"
+          ],
+          "per_class": {
+            "angry": {
+              "support": 2,
+              "f1": 0.5714285714285714,
+              "recall": 1.0
+            },
+            "excited": {
+              "support": 3,
+              "f1": 0.6,
+              "recall": 1.0
+            },
+            "frustrated": {
+              "support": 2,
+              "f1": 0.5,
+              "recall": 0.5
+            },
+            "happy": {
+              "support": 3,
+              "f1": 0.0,
+              "recall": 0.0
+            },
+            "neutral": {
+              "support": 7,
+              "f1": 0.6,
+              "recall": 0.42857142857142855
+            },
+            "sad": {
+              "support": 3,
+              "f1": 1.0,
+              "recall": 1.0
+            }
+          },
+          "confusion": {
+            "angry": {
+              "angry": 2
+            },
+            "excited": {
+              "excited": 3
+            },
+            "frustrated": {
+              "angry": 1,
+              "frustrated": 1
+            },
+            "happy": {
+              "excited": 3
+            },
+            "neutral": {
+              "angry": 2,
+              "frustrated": 1,
+              "neutral": 3,
+              "excited": 1
+            },
+            "sad": {
+              "sad": 3
+            }
+          },
+          "excluded_labels": {
+            "disgust": 2,
+            "fear": 3,
+            "joy": 3,
+            "surprise": 3
+          },
+          "missing_predictions": 0
+        }
+      }
+    },
+    {
+      "name": "whisper-cuda",
+      "settings": {
+        "asr_backend": "whisper",
+        "asr_model": "tiny.en",
+        "device": "cuda",
+        "diarization_backend": "none",
+        "unknown_speaker_policy": "omit_embedding",
+        "snap_splits_to_sentences": true,
+        "min_speaker_run_tokens": 2,
+        "min_speaker_run_duration": 0.4,
+        "asr_batched_inference": false,
+        "asr_batch_size": 16,
+        "asr_beam_size": 5,
+        "parakeet_model": "nvidia/parakeet-tdt-0.6b-v3",
+        "language": "en"
+      },
+      "source_report_sha256": "078eee068a728328340a68f23f0250217accb99cac62e5816d41ecc4a254a7e7",
+      "video_files": [
+        "Anger.mp4",
+        "Disgust.mp4",
+        "Excited.mp4",
+        "Fear.mp4",
+        "Frustrated.mp4",
+        "Happy.mp4",
+        "Joy.mp4",
+        "Neutral.mp4",
+        "Sadness.mp4",
+        "Surprise.mp4"
+      ],
+      "effective_asr_compute_type": "float32",
+      "summary": {
+        "video_count": 10,
+        "segment_count": 20,
+        "asr": {
+          "reference_words": 217,
+          "hypothesis_words": 216,
+          "errors": 4,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.018433179723502304
+        },
+        "exported_transcript": {
+          "reference_words": 217,
+          "hypothesis_words": 216,
+          "errors": 4,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.018433179723502304
+        },
+        "timeline_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 0.0,
+          "uncovered_seconds": 80.0,
+          "unknown_seconds": 0,
+          "confusion_seconds": 0.0,
+          "accuracy": 0.0
+        },
+        "exported_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 0.0,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 69.52799999999999,
+          "confusion_seconds": 0.0,
+          "accuracy": 0.0
+        },
+        "timeline_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 0,
+          "matched": 0,
+          "precision": null,
+          "recall": 0.0,
+          "mean_absolute_error_seconds": null
+        },
+        "exported_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 0,
+          "matched": 0,
+          "precision": null,
+          "recall": 0.0,
+          "mean_absolute_error_seconds": null
+        },
+        "emotion": {
+          "scored_turns": 20,
+          "correct_turns": 12,
+          "accuracy": 0.6,
+          "macro_f1": 0.5452380952380952,
+          "macro_f1_classes": [
+            "angry",
+            "excited",
+            "frustrated",
+            "happy",
+            "neutral",
+            "sad"
+          ],
+          "per_class": {
+            "angry": {
+              "support": 2,
+              "f1": 0.5714285714285714,
+              "recall": 1.0
+            },
+            "excited": {
+              "support": 3,
+              "f1": 0.6,
+              "recall": 1.0
+            },
+            "frustrated": {
+              "support": 2,
+              "f1": 0.5,
+              "recall": 0.5
+            },
+            "happy": {
+              "support": 3,
+              "f1": 0.0,
+              "recall": 0.0
+            },
+            "neutral": {
+              "support": 7,
+              "f1": 0.6,
+              "recall": 0.42857142857142855
+            },
+            "sad": {
+              "support": 3,
+              "f1": 1.0,
+              "recall": 1.0
+            }
+          },
+          "confusion": {
+            "angry": {
+              "angry": 2
+            },
+            "excited": {
+              "excited": 3
+            },
+            "frustrated": {
+              "angry": 1,
+              "frustrated": 1
+            },
+            "happy": {
+              "excited": 3
+            },
+            "neutral": {
+              "angry": 2,
+              "frustrated": 1,
+              "neutral": 3,
+              "excited": 1
+            },
+            "sad": {
+              "sad": 3
+            }
+          },
+          "excluded_labels": {
+            "disgust": 2,
+            "fear": 3,
+            "joy": 3,
+            "surprise": 3
+          },
+          "missing_predictions": 0
+        }
+      }
+    },
+    {
+      "name": "whisper-redimnet2-cpu",
+      "settings": {
+        "asr_backend": "whisper",
+        "asr_model": "tiny.en",
+        "device": "cpu",
+        "diarization_backend": "redimnet2",
+        "unknown_speaker_policy": "omit_embedding",
+        "snap_splits_to_sentences": true,
+        "min_speaker_run_tokens": 2,
+        "min_speaker_run_duration": 0.4,
+        "asr_batched_inference": false,
+        "asr_batch_size": 16,
+        "asr_beam_size": 5,
+        "parakeet_model": "nvidia/parakeet-tdt-0.6b-v3",
+        "language": "en"
+      },
+      "source_report_sha256": "ca73b890db6b59ee08e148156832bffa6877630490a0bc719332dfd5703731f9",
+      "video_files": [
+        "Anger.mp4",
+        "Disgust.mp4",
+        "Excited.mp4",
+        "Fear.mp4",
+        "Frustrated.mp4",
+        "Happy.mp4",
+        "Joy.mp4",
+        "Neutral.mp4",
+        "Sadness.mp4",
+        "Surprise.mp4"
+      ],
+      "effective_asr_compute_type": "int8",
+      "summary": {
+        "video_count": 10,
+        "segment_count": 26,
+        "asr": {
+          "reference_words": 217,
+          "hypothesis_words": 217,
+          "errors": 5,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 1,
+          "wer": 0.02304147465437788
+        },
+        "exported_transcript": {
+          "reference_words": 217,
+          "hypothesis_words": 217,
+          "errors": 5,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 1,
+          "wer": 0.02304147465437788
+        },
+        "timeline_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 55.68,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 7.140000000000001,
+          "confusion_seconds": 6.708,
+          "accuracy": 0.696
+        },
+        "exported_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 54.800000000000004,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 5.399999999999999,
+          "confusion_seconds": 9.328000000000001,
+          "accuracy": 0.685
+        },
+        "timeline_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 19,
+          "matched": 14,
+          "precision": 0.7368421052631579,
+          "recall": 0.6666666666666666,
+          "mean_absolute_error_seconds": 0.14728571428571427
+        },
+        "exported_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 14,
+          "matched": 13,
+          "precision": 0.9285714285714286,
+          "recall": 0.6190476190476191,
+          "mean_absolute_error_seconds": 0.13830769230769224
+        },
+        "emotion": {
+          "scored_turns": 20,
+          "correct_turns": 15,
+          "accuracy": 0.75,
+          "macro_f1": 0.6944444444444443,
+          "macro_f1_classes": [
+            "angry",
+            "excited",
+            "frustrated",
+            "happy",
+            "neutral",
+            "sad"
+          ],
+          "per_class": {
+            "angry": {
+              "support": 2,
+              "f1": 0.6666666666666666,
+              "recall": 1.0
+            },
+            "excited": {
+              "support": 3,
+              "f1": 0.6666666666666666,
+              "recall": 1.0
+            },
+            "frustrated": {
+              "support": 2,
+              "f1": 1.0,
+              "recall": 1.0
+            },
+            "happy": {
+              "support": 3,
+              "f1": 0.0,
+              "recall": 0.0
+            },
+            "neutral": {
+              "support": 7,
+              "f1": 0.8333333333333334,
+              "recall": 0.7142857142857143
+            },
+            "sad": {
+              "support": 3,
+              "f1": 1.0,
+              "recall": 1.0
+            }
+          },
+          "confusion": {
+            "angry": {
+              "angry": 2
+            },
+            "excited": {
+              "excited": 3
+            },
+            "frustrated": {
+              "frustrated": 2
+            },
+            "happy": {
+              "excited": 3
+            },
+            "neutral": {
+              "angry": 2,
+              "neutral": 5
+            },
+            "sad": {
+              "sad": 3
+            }
+          },
+          "excluded_labels": {
+            "disgust": 2,
+            "fear": 3,
+            "joy": 3,
+            "surprise": 3
+          },
+          "missing_predictions": 0
+        }
+      }
+    },
+    {
+      "name": "whisper-batched-cuda",
+      "settings": {
+        "asr_backend": "whisper",
+        "asr_model": "tiny.en",
+        "device": "cuda",
+        "diarization_backend": "redimnet2",
+        "unknown_speaker_policy": "omit_embedding",
+        "snap_splits_to_sentences": true,
+        "min_speaker_run_tokens": 2,
+        "min_speaker_run_duration": 0.4,
+        "asr_batched_inference": true,
+        "asr_batch_size": 16,
+        "asr_beam_size": 5,
+        "parakeet_model": "nvidia/parakeet-tdt-0.6b-v3",
+        "language": "en"
+      },
+      "source_report_sha256": "eb802dac1fd8d226138ba90f6534b89d11115f976a1f0b019dd4a82c856c4304",
+      "video_files": [
+        "Anger.mp4",
+        "Disgust.mp4",
+        "Excited.mp4",
+        "Fear.mp4",
+        "Frustrated.mp4",
+        "Happy.mp4",
+        "Joy.mp4",
+        "Neutral.mp4",
+        "Sadness.mp4",
+        "Surprise.mp4"
+      ],
+      "effective_asr_compute_type": "float32",
+      "summary": {
+        "video_count": 10,
+        "segment_count": 26,
+        "asr": {
+          "reference_words": 217,
+          "hypothesis_words": 216,
+          "errors": 4,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.018433179723502304
+        },
+        "exported_transcript": {
+          "reference_words": 217,
+          "hypothesis_words": 216,
+          "errors": 4,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.018433179723502304
+        },
+        "timeline_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 55.68,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 7.140000000000001,
+          "confusion_seconds": 6.708,
+          "accuracy": 0.696
+        },
+        "exported_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 54.92000000000001,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 5.4399999999999995,
+          "confusion_seconds": 9.168,
+          "accuracy": 0.6865000000000001
+        },
+        "timeline_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 19,
+          "matched": 14,
+          "precision": 0.7368421052631579,
+          "recall": 0.6666666666666666,
+          "mean_absolute_error_seconds": 0.14728571428571427
+        },
+        "exported_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 14,
+          "matched": 13,
+          "precision": 0.9285714285714286,
+          "recall": 0.6190476190476191,
+          "mean_absolute_error_seconds": 0.11676923076923075
+        },
+        "emotion": {
+          "scored_turns": 20,
+          "correct_turns": 14,
+          "accuracy": 0.7,
+          "macro_f1": 0.623015873015873,
+          "macro_f1_classes": [
+            "angry",
+            "excited",
+            "frustrated",
+            "happy",
+            "neutral",
+            "sad"
+          ],
+          "per_class": {
+            "angry": {
+              "support": 2,
+              "f1": 0.5714285714285714,
+              "recall": 1.0
+            },
+            "excited": {
+              "support": 3,
+              "f1": 0.6666666666666666,
+              "recall": 1.0
+            },
+            "frustrated": {
+              "support": 2,
+              "f1": 0.6666666666666666,
+              "recall": 0.5
+            },
+            "happy": {
+              "support": 3,
+              "f1": 0.0,
+              "recall": 0.0
+            },
+            "neutral": {
+              "support": 7,
+              "f1": 0.8333333333333334,
+              "recall": 0.7142857142857143
+            },
+            "sad": {
+              "support": 3,
+              "f1": 1.0,
+              "recall": 1.0
+            }
+          },
+          "confusion": {
+            "angry": {
+              "angry": 2
+            },
+            "excited": {
+              "excited": 3
+            },
+            "frustrated": {
+              "angry": 1,
+              "frustrated": 1
+            },
+            "happy": {
+              "excited": 3
+            },
+            "neutral": {
+              "angry": 2,
+              "neutral": 5
+            },
+            "sad": {
+              "sad": 3
+            }
+          },
+          "excluded_labels": {
+            "disgust": 2,
+            "fear": 3,
+            "joy": 3,
+            "surprise": 3
+          },
+          "missing_predictions": 0
+        }
+      }
+    },
+    {
+      "name": "whisper-raw-splits-cuda",
+      "settings": {
+        "asr_backend": "whisper",
+        "asr_model": "tiny.en",
+        "device": "cuda",
+        "diarization_backend": "redimnet2",
+        "unknown_speaker_policy": "omit_embedding",
+        "snap_splits_to_sentences": false,
+        "min_speaker_run_tokens": 2,
+        "min_speaker_run_duration": 0.4,
+        "asr_batched_inference": false,
+        "asr_batch_size": 16,
+        "asr_beam_size": 5,
+        "parakeet_model": "nvidia/parakeet-tdt-0.6b-v3",
+        "language": "en"
+      },
+      "source_report_sha256": "76fde2d09c9c574f79d93a91d7731d8bd7cef33b648124f9011e51eee11680e8",
+      "video_files": [
+        "Anger.mp4",
+        "Disgust.mp4",
+        "Excited.mp4",
+        "Fear.mp4",
+        "Frustrated.mp4",
+        "Happy.mp4",
+        "Joy.mp4",
+        "Neutral.mp4",
+        "Sadness.mp4",
+        "Surprise.mp4"
+      ],
+      "effective_asr_compute_type": "float32",
+      "summary": {
+        "video_count": 10,
+        "segment_count": 27,
+        "asr": {
+          "reference_words": 217,
+          "hypothesis_words": 216,
+          "errors": 4,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.018433179723502304
+        },
+        "exported_transcript": {
+          "reference_words": 217,
+          "hypothesis_words": 216,
+          "errors": 4,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.018433179723502304
+        },
+        "timeline_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 55.68,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 7.140000000000001,
+          "confusion_seconds": 6.708,
+          "accuracy": 0.696
+        },
+        "exported_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 56.38,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 6.039999999999999,
+          "confusion_seconds": 7.1080000000000005,
+          "accuracy": 0.70475
+        },
+        "timeline_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 19,
+          "matched": 14,
+          "precision": 0.7368421052631579,
+          "recall": 0.6666666666666666,
+          "mean_absolute_error_seconds": 0.14728571428571427
+        },
+        "exported_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 16,
+          "matched": 14,
+          "precision": 0.875,
+          "recall": 0.6666666666666666,
+          "mean_absolute_error_seconds": 0.14557142857142852
+        },
+        "emotion": {
+          "scored_turns": 20,
+          "correct_turns": 11,
+          "accuracy": 0.55,
+          "macro_f1": 0.49145299145299143,
+          "macro_f1_classes": [
+            "angry",
+            "excited",
+            "frustrated",
+            "happy",
+            "neutral",
+            "sad"
+          ],
+          "per_class": {
+            "angry": {
+              "support": 2,
+              "f1": 0.5,
+              "recall": 1.0
+            },
+            "excited": {
+              "support": 3,
+              "f1": 0.6666666666666666,
+              "recall": 1.0
+            },
+            "frustrated": {
+              "support": 2,
+              "f1": 0.6666666666666666,
+              "recall": 0.5
+            },
+            "happy": {
+              "support": 3,
+              "f1": 0.0,
+              "recall": 0.0
+            },
+            "neutral": {
+              "support": 7,
+              "f1": 0.6153846153846154,
+              "recall": 0.5714285714285714
+            },
+            "sad": {
+              "support": 3,
+              "f1": 0.5,
+              "recall": 0.3333333333333333
+            }
+          },
+          "confusion": {
+            "angry": {
+              "angry": 2
+            },
+            "excited": {
+              "excited": 3
+            },
+            "frustrated": {
+              "angry": 1,
+              "frustrated": 1
+            },
+            "happy": {
+              "excited": 3
+            },
+            "neutral": {
+              "angry": 3,
+              "neutral": 4
+            },
+            "sad": {
+              "neutral": 2,
+              "sad": 1
+            }
+          },
+          "excluded_labels": {
+            "disgust": 2,
+            "fear": 3,
+            "joy": 3,
+            "surprise": 3
+          },
+          "missing_predictions": 0
+        }
+      }
+    },
+    {
+      "name": "whisper-redimnet2-cuda",
+      "settings": {
+        "asr_backend": "whisper",
+        "asr_model": "tiny.en",
+        "device": "cuda",
+        "diarization_backend": "redimnet2",
+        "unknown_speaker_policy": "omit_embedding",
+        "snap_splits_to_sentences": true,
+        "min_speaker_run_tokens": 2,
+        "min_speaker_run_duration": 0.4,
+        "asr_batched_inference": false,
+        "asr_batch_size": 16,
+        "asr_beam_size": 5,
+        "parakeet_model": "nvidia/parakeet-tdt-0.6b-v3",
+        "language": "en"
+      },
+      "source_report_sha256": "789134ff10e09ad7e224f2809e742f808d19044886c433d816e469f7bfdfb6bc",
+      "video_files": [
+        "Anger.mp4",
+        "Disgust.mp4",
+        "Excited.mp4",
+        "Fear.mp4",
+        "Frustrated.mp4",
+        "Happy.mp4",
+        "Joy.mp4",
+        "Neutral.mp4",
+        "Sadness.mp4",
+        "Surprise.mp4"
+      ],
+      "effective_asr_compute_type": "float32",
+      "summary": {
+        "video_count": 10,
+        "segment_count": 26,
+        "asr": {
+          "reference_words": 217,
+          "hypothesis_words": 216,
+          "errors": 4,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.018433179723502304
+        },
+        "exported_transcript": {
+          "reference_words": 217,
+          "hypothesis_words": 216,
+          "errors": 4,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.018433179723502304
+        },
+        "timeline_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 55.68,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 7.140000000000001,
+          "confusion_seconds": 6.708,
+          "accuracy": 0.696
+        },
+        "exported_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 54.910000000000004,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 5.419999999999999,
+          "confusion_seconds": 9.198,
+          "accuracy": 0.6863750000000001
+        },
+        "timeline_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 19,
+          "matched": 14,
+          "precision": 0.7368421052631579,
+          "recall": 0.6666666666666666,
+          "mean_absolute_error_seconds": 0.14728571428571427
+        },
+        "exported_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 14,
+          "matched": 13,
+          "precision": 0.9285714285714286,
+          "recall": 0.6190476190476191,
+          "mean_absolute_error_seconds": 0.11984615384615384
+        },
+        "emotion": {
+          "scored_turns": 20,
+          "correct_turns": 14,
+          "accuracy": 0.7,
+          "macro_f1": 0.623015873015873,
+          "macro_f1_classes": [
+            "angry",
+            "excited",
+            "frustrated",
+            "happy",
+            "neutral",
+            "sad"
+          ],
+          "per_class": {
+            "angry": {
+              "support": 2,
+              "f1": 0.5714285714285714,
+              "recall": 1.0
+            },
+            "excited": {
+              "support": 3,
+              "f1": 0.6666666666666666,
+              "recall": 1.0
+            },
+            "frustrated": {
+              "support": 2,
+              "f1": 0.6666666666666666,
+              "recall": 0.5
+            },
+            "happy": {
+              "support": 3,
+              "f1": 0.0,
+              "recall": 0.0
+            },
+            "neutral": {
+              "support": 7,
+              "f1": 0.8333333333333334,
+              "recall": 0.7142857142857143
+            },
+            "sad": {
+              "support": 3,
+              "f1": 1.0,
+              "recall": 1.0
+            }
+          },
+          "confusion": {
+            "angry": {
+              "angry": 2
+            },
+            "excited": {
+              "excited": 3
+            },
+            "frustrated": {
+              "angry": 1,
+              "frustrated": 1
+            },
+            "happy": {
+              "excited": 3
+            },
+            "neutral": {
+              "angry": 2,
+              "neutral": 5
+            },
+            "sad": {
+              "sad": 3
+            }
+          },
+          "excluded_labels": {
+            "disgust": 2,
+            "fear": 3,
+            "joy": 3,
+            "surprise": 3
+          },
+          "missing_predictions": 0
+        }
+      }
+    },
+    {
+      "name": "whisper-reserve-slot-cuda",
+      "settings": {
+        "asr_backend": "whisper",
+        "asr_model": "tiny.en",
+        "device": "cuda",
+        "diarization_backend": "redimnet2",
+        "unknown_speaker_policy": "reserve_slot",
+        "snap_splits_to_sentences": true,
+        "min_speaker_run_tokens": 2,
+        "min_speaker_run_duration": 0.4,
+        "asr_batched_inference": false,
+        "asr_batch_size": 16,
+        "asr_beam_size": 5,
+        "parakeet_model": "nvidia/parakeet-tdt-0.6b-v3",
+        "language": "en"
+      },
+      "source_report_sha256": "3b08a53e7b00513fc0135ba9fa8f73f82896052355d1dce9710ed5275510b9e1",
+      "video_files": [
+        "Anger.mp4",
+        "Disgust.mp4",
+        "Joy.mp4",
+        "Surprise.mp4"
+      ],
+      "effective_asr_compute_type": "float32",
+      "summary": {
+        "video_count": 4,
+        "segment_count": 12,
+        "asr": {
+          "reference_words": 77,
+          "hypothesis_words": 77,
+          "errors": 0,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "wer": 0.0
+        },
+        "exported_transcript": {
+          "reference_words": 77,
+          "hypothesis_words": 77,
+          "errors": 0,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "wer": 0.0
+        },
+        "timeline_speakers": {
+          "reference_seconds": 32.0,
+          "correct_seconds": 20.744,
+          "uncovered_seconds": 3.6160000000000005,
+          "unknown_seconds": 6.140000000000001,
+          "confusion_seconds": 1.5000000000000004,
+          "accuracy": 0.64825
+        },
+        "exported_speakers": {
+          "reference_seconds": 32.0,
+          "correct_seconds": 21.474000000000004,
+          "uncovered_seconds": 3.6160000000000005,
+          "unknown_seconds": 5.419999999999999,
+          "confusion_seconds": 1.4900000000000002,
+          "accuracy": 0.6710625000000001
+        },
+        "timeline_boundaries": {
+          "reference_boundaries": 9,
+          "predicted_boundaries": 8,
+          "matched": 7,
+          "precision": 0.875,
+          "recall": 0.7777777777777778,
+          "mean_absolute_error_seconds": 0.12628571428571428
+        },
+        "exported_boundaries": {
+          "reference_boundaries": 9,
+          "predicted_boundaries": 8,
+          "matched": 8,
+          "precision": 1.0,
+          "recall": 0.8888888888888888,
+          "mean_absolute_error_seconds": 0.08174999999999993
+        },
+        "emotion": {
+          "scored_turns": 5,
+          "correct_turns": 4,
+          "accuracy": 0.8,
+          "macro_f1": 0.9,
+          "macro_f1_classes": [
+            "angry",
+            "neutral"
+          ],
+          "per_class": {
+            "angry": {
+              "support": 2,
+              "f1": 1.0,
+              "recall": 1.0
+            },
+            "neutral": {
+              "support": 3,
+              "f1": 0.8,
+              "recall": 0.6666666666666666
+            }
+          },
+          "confusion": {
+            "angry": {
+              "angry": 2
+            },
+            "neutral": {
+              "frustrated": 1,
+              "neutral": 2
+            }
+          },
+          "excluded_labels": {
+            "disgust": 2,
+            "joy": 3,
+            "surprise": 3
+          },
+          "missing_predictions": 0
+        }
+      }
+    },
+    {
+      "name": "whisper-short-runs-cuda",
+      "settings": {
+        "asr_backend": "whisper",
+        "asr_model": "tiny.en",
+        "device": "cuda",
+        "diarization_backend": "redimnet2",
+        "unknown_speaker_policy": "omit_embedding",
+        "snap_splits_to_sentences": true,
+        "min_speaker_run_tokens": 1,
+        "min_speaker_run_duration": 0.0,
+        "asr_batched_inference": false,
+        "asr_batch_size": 16,
+        "asr_beam_size": 5,
+        "parakeet_model": "nvidia/parakeet-tdt-0.6b-v3",
+        "language": "en"
+      },
+      "source_report_sha256": "8ff1d02fa0fde8c848a603dd03b9bf3f20e231e3f223e1718fd7a218022cb4aa",
+      "video_files": [
+        "Anger.mp4",
+        "Disgust.mp4",
+        "Excited.mp4",
+        "Fear.mp4",
+        "Frustrated.mp4",
+        "Happy.mp4",
+        "Joy.mp4",
+        "Neutral.mp4",
+        "Sadness.mp4",
+        "Surprise.mp4"
+      ],
+      "effective_asr_compute_type": "float32",
+      "summary": {
+        "video_count": 10,
+        "segment_count": 26,
+        "asr": {
+          "reference_words": 217,
+          "hypothesis_words": 216,
+          "errors": 4,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.018433179723502304
+        },
+        "exported_transcript": {
+          "reference_words": 217,
+          "hypothesis_words": 216,
+          "errors": 4,
+          "substitutions": 3,
+          "deletions": 1,
+          "insertions": 0,
+          "wer": 0.018433179723502304
+        },
+        "timeline_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 55.68,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 7.140000000000001,
+          "confusion_seconds": 6.708,
+          "accuracy": 0.696
+        },
+        "exported_speakers": {
+          "reference_seconds": 80.0,
+          "correct_seconds": 53.370000000000005,
+          "uncovered_seconds": 10.472,
+          "unknown_seconds": 6.989999999999999,
+          "confusion_seconds": 9.168,
+          "accuracy": 0.6671250000000001
+        },
+        "timeline_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 19,
+          "matched": 14,
+          "precision": 0.7368421052631579,
+          "recall": 0.6666666666666666,
+          "mean_absolute_error_seconds": 0.14728571428571427
+        },
+        "exported_boundaries": {
+          "reference_boundaries": 21,
+          "predicted_boundaries": 14,
+          "matched": 13,
+          "precision": 0.9285714285714286,
+          "recall": 0.6190476190476191,
+          "mean_absolute_error_seconds": 0.11984615384615381
+        },
+        "emotion": {
+          "scored_turns": 20,
+          "correct_turns": 13,
+          "accuracy": 0.65,
+          "macro_f1": 0.5942279942279942,
+          "macro_f1_classes": [
+            "angry",
+            "excited",
+            "frustrated",
+            "happy",
+            "neutral",
+            "sad"
+          ],
+          "per_class": {
+            "angry": {
+              "support": 2,
+              "f1": 0.5714285714285714,
+              "recall": 1.0
+            },
+            "excited": {
+              "support": 3,
+              "f1": 0.6,
+              "recall": 1.0
+            },
+            "frustrated": {
+              "support": 2,
+              "f1": 0.6666666666666666,
+              "recall": 0.5
+            },
+            "happy": {
+              "support": 3,
+              "f1": 0.0,
+              "recall": 0.0
+            },
+            "neutral": {
+              "support": 7,
+              "f1": 0.7272727272727273,
+              "recall": 0.5714285714285714
+            },
+            "sad": {
+              "support": 3,
+              "f1": 1.0,
+              "recall": 1.0
+            }
+          },
+          "confusion": {
+            "angry": {
+              "angry": 2
+            },
+            "excited": {
+              "excited": 3
+            },
+            "frustrated": {
+              "angry": 1,
+              "frustrated": 1
+            },
+            "happy": {
+              "excited": 3
+            },
+            "neutral": {
+              "angry": 2,
+              "neutral": 4,
+              "excited": 1
+            },
+            "sad": {
+              "sad": 3
+            }
+          },
+          "excluded_labels": {
+            "disgust": 2,
+            "fear": 3,
+            "joy": 3,
+            "surprise": 3
+          },
+          "missing_predictions": 0
+        }
+      }
+    }
+  ],
+  "paired_unknown_policy": {
+    "common_videos": [
+      "Anger.mp4",
+      "Disgust.mp4",
+      "Joy.mp4",
+      "Surprise.mp4"
+    ],
+    "results": {
+      "whisper-redimnet2-cuda": {
+        "scored_turns": 5,
+        "correct_turns": 3,
+        "accuracy": 0.6,
+        "macro_f1": 0.5833333333333333,
+        "macro_f1_classes": [
+          "angry",
+          "neutral"
+        ],
+        "per_class": {
+          "angry": {
+            "support": 2,
+            "f1": 0.6666666666666666,
+            "recall": 1.0
+          },
+          "neutral": {
+            "support": 3,
+            "f1": 0.5,
+            "recall": 0.3333333333333333
+          }
+        },
+        "confusion": {
+          "angry": {
+            "angry": 2
+          },
+          "neutral": {
+            "angry": 2,
+            "neutral": 1
+          }
+        },
+        "excluded_labels": {
+          "disgust": 2,
+          "joy": 3,
+          "surprise": 3
+        },
+        "missing_predictions": 0
+      },
+      "whisper-reserve-slot-cuda": {
+        "scored_turns": 5,
+        "correct_turns": 4,
+        "accuracy": 0.8,
+        "macro_f1": 0.9,
+        "macro_f1_classes": [
+          "angry",
+          "neutral"
+        ],
+        "per_class": {
+          "angry": {
+            "support": 2,
+            "f1": 1.0,
+            "recall": 1.0
+          },
+          "neutral": {
+            "support": 3,
+            "f1": 0.8,
+            "recall": 0.6666666666666666
+          }
+        },
+        "confusion": {
+          "angry": {
+            "angry": 2
+          },
+          "neutral": {
+            "frustrated": 1,
+            "neutral": 2
+          }
+        },
+        "excluded_labels": {
+          "disgust": 2,
+          "joy": 3,
+          "surprise": 3
+        },
+        "missing_predictions": 0
+      }
+    }
+  },
+  "benchmark_runs": [
+    {
+      "name": "parakeet-cpu",
+      "source_report_sha256": "8ecf67f4157e71254a99fbb806d0eda635e579f3e534d74a9499b28600da78e9",
+      "runner_sha256": "aee51895153d72555c9247a7d02ce0f88f68b693042b055755033f1c8144d1f7",
+      "model_load_seconds": 35.37906339392066,
+      "warmup_seconds": {
+        "Anger.mp4": 14.189076840877533,
+        "Neutral.mp4": 18.759345155209303
+      },
+      "summary": {
+        "samples": 4,
+        "median_seconds": 16.507438849657774,
+        "min_seconds": 13.906419493258,
+        "max_seconds": 19.10476503893733,
+        "total_seconds": 66.02606223151088,
+        "total_audio_seconds": 32.0,
+        "real_time_factor": 2.063314444734715
+      },
+      "memory": {
+        "parent_peak_rss_bytes": 8429780992,
+        "sampled_parent_peak_rss_bytes": 7594090496,
+        "sampled_gpu_peak_bytes": null,
+        "torch_peak_allocated_bytes": null,
+        "torch_peak_reserved_bytes": null,
+        "sampler_errors": []
+      },
+      "cuda": null,
+      "samples": [
+        {
+          "video_file": "Anger.mp4",
+          "repeat": 0,
+          "seconds": 13.91213358193636,
+          "audio_duration": 8.0,
+          "segment_count": 2,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Neutral.mp4",
+          "repeat": 0,
+          "seconds": 19.10476503893733,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Anger.mp4",
+          "repeat": 1,
+          "seconds": 13.906419493258,
+          "audio_duration": 8.0,
+          "segment_count": 2,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Neutral.mp4",
+          "repeat": 1,
+          "seconds": 19.10274411737919,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "parakeet-redimnet2-cuda",
+      "source_report_sha256": "af3cfc7b2b8cc6ad3c59396b00f5ac57fbdce1353e307021d300d1af4f786dc3",
+      "runner_sha256": "f26cc3b028f96654faa6433f3787a8a6b9ae48bb1ecb70ac4239391164b1d7d1",
+      "model_load_seconds": 37.95967581868172,
+      "warmup_seconds": {
+        "Anger.mp4": 10.759981829673052,
+        "Neutral.mp4": 9.103984907269478
+      },
+      "summary": {
+        "samples": 4,
+        "median_seconds": 9.695744927972555,
+        "min_seconds": 8.986862294375896,
+        "max_seconds": 10.258355431258678,
+        "total_seconds": 38.636707581579685,
+        "total_audio_seconds": 32.0,
+        "real_time_factor": 1.2073971119243652
+      },
+      "memory": {
+        "parent_peak_rss_bytes": 6723231744,
+        "sampled_parent_peak_rss_bytes": 6723231744,
+        "sampled_gpu_peak_bytes": 5632950272,
+        "torch_peak_allocated_bytes": 5100386304,
+        "torch_peak_reserved_bytes": 5437915136,
+        "sampler_errors": []
+      },
+      "cuda": {
+        "name": "NVIDIA GeForce GTX 1080 Ti",
+        "compute_capability": [
+          6,
+          1
+        ],
+        "total_memory_bytes": 11714887680,
+        "runtime": "12.1"
+      },
+      "samples": [
+        {
+          "video_file": "Anger.mp4",
+          "repeat": 0,
+          "seconds": 10.258355431258678,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Neutral.mp4",
+          "repeat": 0,
+          "seconds": 8.986862294375896,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Anger.mp4",
+          "repeat": 1,
+          "seconds": 10.257274027913809,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Neutral.mp4",
+          "repeat": 1,
+          "seconds": 9.134215828031301,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "whisper-batched-cuda",
+      "source_report_sha256": "2014ba56d24a88fb4f30eb05221d559343cc13a7345aa23ef99b0885a8a385b2",
+      "runner_sha256": "2583a4754515118012205e24b967821834c23ab982760a19cb1f8ddf91ac84d3",
+      "model_load_seconds": 11.262123454362154,
+      "warmup_seconds": {
+        "Anger.mp4": 11.035275343805552,
+        "Neutral.mp4": 8.849150877445936
+      },
+      "summary": {
+        "samples": 4,
+        "median_seconds": 9.435401294380426,
+        "min_seconds": 8.794545769691467,
+        "max_seconds": 10.119874559342861,
+        "total_seconds": 37.78522291779518,
+        "total_audio_seconds": 32.0,
+        "real_time_factor": 1.1807882161810994
+      },
+      "memory": {
+        "parent_peak_rss_bytes": 5553930240,
+        "sampled_parent_peak_rss_bytes": 5553930240,
+        "sampled_gpu_peak_bytes": 2847932416,
+        "torch_peak_allocated_bytes": 2219724800,
+        "torch_peak_reserved_bytes": 2397044736,
+        "sampler_errors": []
+      },
+      "cuda": {
+        "name": "NVIDIA GeForce GTX 1080 Ti",
+        "compute_capability": [
+          6,
+          1
+        ],
+        "total_memory_bytes": 11714887680,
+        "runtime": "12.1"
+      },
+      "samples": [
+        {
+          "video_file": "Anger.mp4",
+          "repeat": 0,
+          "seconds": 10.048867881298065,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Neutral.mp4",
+          "repeat": 0,
+          "seconds": 8.794545769691467,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Anger.mp4",
+          "repeat": 1,
+          "seconds": 10.119874559342861,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Neutral.mp4",
+          "repeat": 1,
+          "seconds": 8.821934707462788,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "whisper-cpu",
+      "source_report_sha256": "8aed012ad74598f7e76365519bb7ec2cc316d57c808a2eb8c022db5906674a55",
+      "runner_sha256": "aee51895153d72555c9247a7d02ce0f88f68b693042b055755033f1c8144d1f7",
+      "model_load_seconds": 8.95689157396555,
+      "warmup_seconds": {
+        "Anger.mp4": 13.80627566576004,
+        "Neutral.mp4": 18.713178507983685
+      },
+      "summary": {
+        "samples": 4,
+        "median_seconds": 16.175412319600582,
+        "min_seconds": 13.470258120447397,
+        "max_seconds": 18.79697723686695,
+        "total_seconds": 64.61805999651551,
+        "total_audio_seconds": 32.0,
+        "real_time_factor": 2.0193143748911098
+      },
+      "memory": {
+        "parent_peak_rss_bytes": 5573799936,
+        "sampled_parent_peak_rss_bytes": 4276727808,
+        "sampled_gpu_peak_bytes": null,
+        "torch_peak_allocated_bytes": null,
+        "torch_peak_reserved_bytes": null,
+        "sampler_errors": []
+      },
+      "cuda": null,
+      "samples": [
+        {
+          "video_file": "Anger.mp4",
+          "repeat": 0,
+          "seconds": 13.563451960682869,
+          "audio_duration": 8.0,
+          "segment_count": 2,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Neutral.mp4",
+          "repeat": 0,
+          "seconds": 18.79697723686695,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Anger.mp4",
+          "repeat": 1,
+          "seconds": 13.470258120447397,
+          "audio_duration": 8.0,
+          "segment_count": 2,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Neutral.mp4",
+          "repeat": 1,
+          "seconds": 18.787372678518295,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "whisper-cuda",
+      "source_report_sha256": "193fbb14524b8df66599e6936c30ea340b913112375d7a9ee530283af2422202",
+      "runner_sha256": "2583a4754515118012205e24b967821834c23ab982760a19cb1f8ddf91ac84d3",
+      "model_load_seconds": 10.836379501968622,
+      "warmup_seconds": {
+        "Anger.mp4": 7.027281112968922,
+        "Neutral.mp4": 8.452237337827682
+      },
+      "summary": {
+        "samples": 4,
+        "median_seconds": 7.177072847262025,
+        "min_seconds": 6.0270595997571945,
+        "max_seconds": 8.312653366476297,
+        "total_seconds": 28.69385866075754,
+        "total_audio_seconds": 32.0,
+        "real_time_factor": 0.8966830831486732
+      },
+      "memory": {
+        "parent_peak_rss_bytes": 5553950720,
+        "sampled_parent_peak_rss_bytes": 5553950720,
+        "sampled_gpu_peak_bytes": 2682257408,
+        "torch_peak_allocated_bytes": 2173302784,
+        "torch_peak_reserved_bytes": 2273312768,
+        "sampler_errors": []
+      },
+      "cuda": {
+        "name": "NVIDIA GeForce GTX 1080 Ti",
+        "compute_capability": [
+          6,
+          1
+        ],
+        "total_memory_bytes": 11714887680,
+        "runtime": "12.1"
+      },
+      "samples": [
+        {
+          "video_file": "Anger.mp4",
+          "repeat": 0,
+          "seconds": 6.045182943344116,
+          "audio_duration": 8.0,
+          "segment_count": 2,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Neutral.mp4",
+          "repeat": 0,
+          "seconds": 8.312653366476297,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Anger.mp4",
+          "repeat": 1,
+          "seconds": 6.0270595997571945,
+          "audio_duration": 8.0,
+          "segment_count": 2,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Neutral.mp4",
+          "repeat": 1,
+          "seconds": 8.308962751179934,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "whisper-redimnet2-cuda",
+      "source_report_sha256": "f2cb8bcca9727c46a796b07198ecaba29e142c4f370197df914876a2e6f6df7f",
+      "runner_sha256": "2583a4754515118012205e24b967821834c23ab982760a19cb1f8ddf91ac84d3",
+      "model_load_seconds": 11.181475836783648,
+      "warmup_seconds": {
+        "Anger.mp4": 11.198601976037025,
+        "Neutral.mp4": 8.996608581393957
+      },
+      "summary": {
+        "samples": 4,
+        "median_seconds": 9.5650988612324,
+        "min_seconds": 8.896762296557426,
+        "max_seconds": 10.37180332839489,
+        "total_seconds": 38.398763347417116,
+        "total_audio_seconds": 32.0,
+        "real_time_factor": 1.1999613546067849
+      },
+      "memory": {
+        "parent_peak_rss_bytes": 5551636480,
+        "sampled_parent_peak_rss_bytes": 4254679040,
+        "sampled_gpu_peak_bytes": 2780823552,
+        "torch_peak_allocated_bytes": 2219724800,
+        "torch_peak_reserved_bytes": 2397044736,
+        "sampler_errors": []
+      },
+      "cuda": {
+        "name": "NVIDIA GeForce GTX 1080 Ti",
+        "compute_capability": [
+          6,
+          1
+        ],
+        "total_memory_bytes": 11714887680,
+        "runtime": "12.1"
+      },
+      "samples": [
+        {
+          "video_file": "Anger.mp4",
+          "repeat": 0,
+          "seconds": 10.175522834062576,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Neutral.mp4",
+          "repeat": 0,
+          "seconds": 8.954674888402224,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Anger.mp4",
+          "repeat": 1,
+          "seconds": 10.37180332839489,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        },
+        {
+          "video_file": "Neutral.mp4",
+          "repeat": 1,
+          "seconds": 8.896762296557426,
+          "audio_duration": 8.0,
+          "segment_count": 3,
+          "stable": true,
+          "issues": []
+        }
+      ]
+    }
+  ],
+  "all_benchmarks_passed": true,
+  "acceptance": {
+    "whisper": {
+      "report_sha256": "5ec1e6ea2cf12c85ee1b9f030f44d23411bf5d05f12ae07bbba90554a7967652",
+      "counts": {
+        "tests_run": 210,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "expected_failures": 0,
+        "unexpected_successes": 0
+      },
+      "passed": true
+    },
+    "parakeet": {
+      "report_sha256": "1786cf3ddd7c0061b8af0a0c6930ef9eaf5dab2671539310c28a948b123c41c3",
+      "counts": {
+        "tests_run": 210,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "expected_failures": 0,
+        "unexpected_successes": 0
+      },
+      "passed": true
+    },
+    "cuda": {
+      "report_sha256": "57185ba5abb5f77b51c73492fc0f94e4a2437f5d791e6c29cb3a4c8e04888dc4",
+      "counts": {
+        "tests_run": 210,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "expected_failures": 0,
+        "unexpected_successes": 0
+      },
+      "passed": true
+    }
+  }
+}
