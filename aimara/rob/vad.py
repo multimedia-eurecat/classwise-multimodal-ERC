@@ -72,6 +72,12 @@ class ROBVoiceActivityDetector:
             logger=selected_logger,
         )
 
+    def reset(self) -> None:
+        """Start a new recording while retaining recurrence between its chunks."""
+        reset_states = getattr(self._model, "reset_states", None)
+        if callable(reset_states):
+            reset_states()
+
     def predict(self, audio: "np.ndarray", sample_rate: int) -> float:
         """Return speech probability for one mono float32 audio chunk."""
         size = getattr(audio, "size", None)

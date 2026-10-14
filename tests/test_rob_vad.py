@@ -45,6 +45,24 @@ class FakeModel:
 
 
 class ROBVoiceActivityDetectorTests(unittest.TestCase):
+    def test_reset_delegates_to_stateful_model_without_reloading_weights(self):
+        model = FakeModel()
+        model.reset_states = Mock()
+        detector = ROBVoiceActivityDetector(
+            model=model, tensor_factory=lambda audio: audio
+        )
+        detector.predict(FakeAudio(), 16000)
+        detector.reset()
+        model.reset_states.assert_called_once_with()
+        self.assertEqual(len(model.calls), 1)
+
+    def test_reset_accepts_injected_stateless_models(self):
+        detector = ROBVoiceActivityDetector(
+            model=FakeModel(), tensor_factory=lambda audio: audio
+        )
+        detector.reset()
+        self.assertEqual(detector.predict(FakeAudio(), 16000), 0.75)
+
     def test_predict_passes_chunk_and_sample_rate_to_model(self):
         model = FakeModel(probability=0.82)
         converted_tensor = object()

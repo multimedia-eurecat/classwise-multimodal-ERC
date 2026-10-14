@@ -16,6 +16,26 @@ class FakeDetector:
 
 
 class OfflineVADProcessorTests(unittest.TestCase):
+    def test_recurrence_is_kept_within_recordings_and_reset_between_recordings(self):
+        class StatefulDetector:
+            steps = 0
+            resets = 0
+
+            def reset(self):
+                self.steps = 0
+                self.resets += 1
+
+            def predict(self, audio, sample_rate):
+                self.steps += 1
+                return 0.9 if self.steps >= 2 else 0.1
+
+        detector = StatefulDetector()
+        processor = OfflineVADProcessor(detector, self.config())
+        audio = np.ones(8, dtype=np.float32)
+        self.assertEqual(processor.process(audio), [SpeechRegion(4, 8)])
+        self.assertEqual(processor.process(audio), [SpeechRegion(4, 8)])
+        self.assertEqual(detector.resets, 2)
+
     def config(self, **overrides):
         values = {
             "sample_rate": 4,

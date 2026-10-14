@@ -72,7 +72,7 @@ its fixtures, reports and completion criteria.
 - A batch run processed all 10 clean `selfie-videos` without pipeline failures.
 - Per-video and combined JSON/CSV outputs preserve VAD timing, transcripts,
   emotion predictions, confidence values, and class probabilities.
-- The automated suite currently contains 195 passing tests covering contracts,
+- The automated suite currently contains 202 passing tests covering contracts,
   VAD/ASR adapters, segmentation, feature alignment, checkpoint validation,
   orchestration, failure handling, and resume behavior.
 
@@ -83,8 +83,9 @@ directly predict synthetic labels such as `fear`, `disgust`, or `surprise`.
 
 ### Known limitations
 
-- Optional ReDimNet2 diarization is integrated; pretrained attribution accuracy
-  and runtime still need evaluation. Unresolved turns retain `UNKNOWN` and omit
+- Optional ReDimNet2 diarization and Parakeet/AmberNet passed pretrained smoke
+  runs on CPU and CUDA. Attribution/transcript/emotion accuracy and comparative
+  runtime still need evaluation. Unresolved turns retain `UNKNOWN` and omit
   speaker embeddings by default.
 - Processing is offline and video-oriented. ROB integration will require a thin
   in-memory or ROS-facing adapter around finalized speech segments.

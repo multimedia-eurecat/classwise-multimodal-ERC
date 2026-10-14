@@ -102,8 +102,9 @@ profile. The fresh Whisper profile ran the cached `Anger.mp4` through VAD,
 transcription, all three encoders, and the real ERC checkpoint without
 `LD_PRELOAD`. Compared with the shared environment, both turns' transcripts,
 timings and emotion labels matched; the largest probability difference was
-about `1.34e-7`. The existing shared environment was not changed. CUDA profiles
-and trained Parakeet/AmberNet inference still require model/hardware validation.
+about `1.34e-7`. The existing shared environment was not changed. Step 12B below
+records the subsequent pretrained CPU/CUDA validation, including Parakeet and
+AmberNet.
 
 ## ROB speech dependencies
 
@@ -262,10 +263,9 @@ retried once with confidence disabled, then the decoding settings are restored.
 
 `tests/test_parakeet.py` and `tests/test_parakeet_cli.py` cover these adapters,
 optional loading, backend selection, and speaker-aware WAV/prediction output
-with model test doubles. NeMo's real imports now pass in the isolated Parakeet
-environment. Trained Parakeet/AmberNet inference has not been run because their
-weights are not cached. Runtime,
-transcript accuracy, and emotion accuracy still require evaluation. Batch
+with model test doubles. Step 12B also exercised trained Parakeet and AmberNet
+on CPU and CUDA with the real feature encoders and ERC checkpoint. Comparative
+runtime, transcript accuracy, and emotion accuracy remain step 12C work. Batch
 `--resume` reruns results when the selected backend or its settings change.
 
 The models are composed by the offline processor, which writes a WAV for each
@@ -670,11 +670,109 @@ source-frame windows, ASR-input intervals, chronological context, finite normali
 six-class probabilities and matching JSON/CSV exports. The tiny ERC checkpoint
 is seeded and untrained; its output labels serve contract validation.
 
-Step 12B covers pretrained-model smoke runs, including ReDimNet2 and
+Step 12B below covers pretrained-model smoke runs, including ReDimNet2 and
 Parakeet/AmberNet weights and available CUDA hardware. Step 12C covers reference
 accuracy, configuration comparisons, latency and memory measurements. Passing
 12A establishes the deterministic integration contracts; those model-quality
 and deployment checks remain separate validation stages.
+
+## Pretrained-model smoke validation: step 12B
+
+`run_model_smoke` loads the actual pretrained models and runs the normal batch
+pipeline with observations of ASR words, language-ID probabilities and speaker
+intervals. It accepts the same runtime options as the normal runners:
+
+```bash
+python -m aimara.run_model_smoke \
+  --video-dir /home/Imatge/media/ssd2/AIMARA/videos/selfie-videos \
+  --reference-csv /home/Imatge/media/ssd2/AIMARA/input_csv/selfie-videos.csv \
+  --output-dir /tmp/aimara-model-smoke-whisper \
+  --checkpoint /home/Imatge/media/ssd2/oriol/checkpoints/IEMOCAP/final/vit_softmax.pt \
+  --vad-weights /tmp/aimara-silero \
+  --asr-weights /home/Imatge/media/ssd2/AIMARA/models/faster-whisper \
+  --audio-model /home/Imatge/media/ssd2/AIMARA/evaluation_pipeline/models/modelscope/iic/emotion2vec_plus_large \
+  --device cpu
+```
+
+Select a subset by repeating `--video`, for example `--video Anger.mp4 --video
+Happy.mp4 --video Neutral.mp4`. Use a fresh output directory for each configuration.
+The runner stages symlinks for a selected subset; original media and annotations
+remain in their source directories. Weights load once and stay available across
+videos. Normal JSON/CSV predictions, failures, and resume manifests are retained.
+
+Append `--diarization-backend redimnet2 --diarization-weights
+/tmp/aimara-12b-models/redimnet2` to exercise the pretrained speaker model.
+For Parakeet/AmberNet, replace `--asr-weights` with
+`/tmp/aimara-12b-models/parakeet` and append:
+
+```bash
+--asr-backend parakeet --language auto --require-language-id
+```
+
+The explicit loaders fetch missing weights on first use. After populating the
+cache, add `--parakeet-local-files-only` to require local Parakeet and AmberNet
+checkpoints. `--require-language-id` fails if the identifier cannot load or no
+successful probability-producing identifier calls occur. An output language
+can still be unset when the score falls below the configured threshold; it does
+not reuse a previous input's label. For CUDA, activate the pinned CUDA profile,
+expose its cuBLAS/cuDNN libraries as described in the setup section, select an
+available GPU with `CUDA_VISIBLE_DEVICES`, and use `--device cuda`.
+
+Each configuration produces `smoke_report.json`; each video also receives
+`model_observations.json`. Reports preserve source/configuration identities,
+model-artifact SHA-256 hashes, package versions, actual precision/device,
+reference-annotation checksum, raw ASR words, language-ID probabilities, speaker
+timelines and prediction checks. Timings are observations from a smoke run;
+controlled latency/memory comparisons belong to step 12C.
+
+Smoke gates check chronological word timestamps bounded by the ASR input (with
+a 0.2-second tolerance for decoder frame rounding), exact segment WAV content
+and source bounds, sequential segment IDs, finite normalized six-class ERC
+probabilities, and nonempty predictions for annotated speech. The first
+successful video is repeated after the batch to verify that turn/text/language/
+speaker/emotion outputs remain stable; probabilities may differ by at most
+`1e-5`. Use `--no-check-state-reset` only for a run that intentionally omits that
+check. Model-load failures and per-video failures are recorded, and the command
+exits nonzero when the selected configuration fails its gates.
+
+Real runs exposed Silero recurrence leaking between recordings: `Happy.mp4`
+produced different VAD regions after different preceding videos. The adapter now
+resets Silero at each offline recording's start while retaining recurrence
+between chunks within that recording. Regression tests cover both boundaries,
+and the real clip was checked in both orders. Resume cache version 2 invalidates
+older manifests because this correction can change segmentation and predictions.
+
+The versioned [validation receipt](model_smoke_results.json) records the final
+CPU/CUDA matrix on the clean English selfie-video set, with the default
+`tiny.en` Whisper and `nvidia/parakeet-tdt-0.6b-v3` Parakeet model. CUDA runs used
+GTX 1080 Ti cards with the pinned CUDA 12.1 profile. Whisper's requested float16
+precision fell back to float32 on these cards; reports record that effective
+precision. Parakeet used float32. The underlying speech decisions and all three
+feature encoders executed with pretrained weights; no model doubles were used.
+
+| Final configuration | Videos | Emotion segments | Smoke result |
+|---|---:|---:|---|
+| Whisper CPU | 10 | 20 | Passed |
+| Whisper + ReDimNet2 CPU | 10 | 26 | Passed |
+| Whisper CUDA | 10 | 20 | Passed |
+| Parakeet + AmberNet CPU | 3 | 6 | Passed |
+| Parakeet + AmberNet + ReDimNet2 CUDA | 10 | 27 | Passed |
+
+All 43 video/configuration runs and all five repeated-input state checks passed
+after the Silero correction. Both CPU environments and the CUDA environment
+also passed 202 acceptance tests with zero skips. Final detailed artifacts are
+under `/tmp/aimara-12b-v2/<configuration>/`; the compact receipt is versioned in
+the repository. Original model weights and input media remain outside it.
+
+Reference speaker diagnostics compare dominant timeline labels per annotated
+turn and recognize A → B → A up to an identity-label permutation. These quality
+diagnostics are reported independently from smoke gates. Short middle turns
+can remain UNKNOWN, and some turns can share an identity. The final corrected
+runs recovered the annotated A → B → A pattern in four of ten clips in both
+diarization configurations. Step 12C must quantify those attribution errors
+along with transcript/emotion accuracy and runtime. This set covers
+English clips and the tested hardware; other languages, noise conditions and
+hardware still need their own validation.
 
 The output root contains combined `predictions.csv`, `predictions.json`, and
 `failures.json` files. Each video also receives its own directory containing

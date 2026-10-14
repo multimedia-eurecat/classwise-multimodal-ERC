@@ -41,6 +41,10 @@ class OfflineVADProcessor:
         if str(getattr(audio, "dtype", "")) != "float32":
             raise TypeError("audio must use float32 samples")
 
+        reset = getattr(self.detector, "reset", None)
+        if callable(reset):
+            reset()
+
         probabilities: List[float] = []
         for start in range(0, int(audio.size), self.config.chunk_size):
             source = audio[start : start + self.config.chunk_size]

@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 # Bump when prediction/manifest semantics change incompatibly.
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 MANIFEST_NAME = "resume_manifest.json"
 
 
