@@ -12,6 +12,7 @@ import numpy as np
 from omegaconf import OmegaConf
 
 from aimara import (
+    ASRMetadata,
     EmotionPrediction,
     ERCFeatureBridge,
     OfflineROBProcessor,
@@ -172,20 +173,29 @@ class ParakeetTests(unittest.TestCase):
         identifier = SimpleNamespace(probabilities=Mock())
         model = NemoModel([[], [SimpleNamespace(text="", timestamp={})]])
         transcriber = ParakeetTranscriber(model=model, language_identifier=identifier)
-        self.assertEqual(
-            transcriber.transcribe(self.audio(0.005), 16000), Transcript("")
+        empty = Transcript(
+            "",
+            metadata=ASRMetadata(
+                backend="parakeet",
+                model="nvidia/parakeet-tdt-0.6b-v3",
+                device="cpu",
+                compute_type="float32",
+            ),
         )
+        self.assertEqual(transcriber.transcribe(self.audio(0.005), 16000), empty)
         self.assertEqual(len(model.calls), 0)
-        self.assertEqual(transcriber.transcribe(self.audio(), 16000), Transcript(""))
-        self.assertEqual(transcriber.transcribe(self.audio(), 16000), Transcript(""))
+        self.assertEqual(transcriber.transcribe(self.audio(), 16000), empty)
+        self.assertEqual(transcriber.transcribe(self.audio(), 16000), empty)
         identifier.probabilities.assert_not_called()
 
     def test_confidence_failure_retries_and_restores_decoding_even_if_retry_fails(self):
         for error_type in (ValueError, RuntimeError):
             for retry_fails in (False, True):
                 with self.subTest(error_type=error_type, retry_fails=retry_fails):
+                    recovered = hypothesis()
+                    recovered.word_confidence = [0.9] * 4
                     second = (
-                        RuntimeError("retry failed") if retry_fails else [hypothesis()]
+                        RuntimeError("retry failed") if retry_fails else [recovered]
                     )
                     model = NemoModel(
                         [
@@ -202,10 +212,9 @@ class ParakeetTests(unittest.TestCase):
                         ):
                             transcriber.transcribe(self.audio(), 16000)
                     else:
-                        self.assertEqual(
-                            transcriber.transcribe(self.audio(), 16000).text,
-                            hypothesis().text,
-                        )
+                        result = transcriber.transcribe(self.audio(), 16000)
+                        self.assertEqual(result.text, hypothesis().text)
+                        self.assertIsNone(result.metadata.transcript_confidence)
                     self.assertEqual(len(model.calls), 2)
                     self.assertEqual(
                         [
@@ -248,6 +257,41 @@ class ParakeetTests(unittest.TestCase):
         )
         self.assertIsNone(transcriber.transcribe(self.audio(0.2), 16000).language)
         self.assertEqual(identifier.probabilities.call_count, 3)
+
+    def test_confidence_is_mean_of_reported_word_scores_and_zero_is_available(self):
+        for values, expected in (([0.9, 0.8, 0.7, 0.8], 0.8), ([0.0] * 4, 0.0)):
+            with self.subTest(values=values):
+                hyp = hypothesis()
+                hyp.word_confidence = values
+                result = ParakeetTranscriber(
+                    model=NemoModel([[hyp]]), config=ParakeetConfig(language="en")
+                ).transcribe(self.audio(), 16000)
+                self.assertAlmostEqual(result.metadata.transcript_confidence, expected)
+                self.assertEqual(
+                    result.metadata.confidence_method, "mean_word_confidence"
+                )
+                self.assertEqual(result.metadata.language_source, "configured")
+                self.assertEqual(result.metadata.backend, "parakeet")
+
+    def test_missing_or_invalid_confidence_preserves_transcript_without_a_score(self):
+        for values in (
+            None,
+            [],
+            [float("nan")],
+            [float("inf")],
+            [-0.1],
+            [1.1],
+            ["invalid"],
+        ):
+            with self.subTest(values=values):
+                hyp = hypothesis()
+                hyp.word_confidence = values
+                result = ParakeetTranscriber(model=NemoModel([[hyp]])).transcribe(
+                    self.audio(), 16000
+                )
+                self.assertEqual(result.text, hyp.text)
+                self.assertIsNone(result.metadata.transcript_confidence)
+                self.assertIsNone(result.metadata.confidence_method)
 
     def test_invalid_languages_audio_and_timestamps_fail_explicitly(self):
         for language in ("ca", "en,ca", "", "auto,en"):

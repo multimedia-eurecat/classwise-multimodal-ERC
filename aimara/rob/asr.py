@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 
 from ..speech_interfaces import Transcript, TranscriptSegment, TranscriptWord
+from ..speech_metadata import ASRMetadata
 
 if TYPE_CHECKING:
     import numpy as np
@@ -245,9 +246,9 @@ class ROBTranscriber:
             raise ValueError("Faster-Whisper audio must use a 16000 Hz sample rate")
 
         if audio.size < int(sample_rate * self.MIN_TRANSCRIPTION_DURATION):
-            return Transcript(text="", language=None)
+            return Transcript(text="", metadata=self._metadata())
 
-        transcription_language = self._resolve_language(audio)
+        transcription_language, language_source = self._resolve_language(audio)
         try:
             kwargs = {
                 "vad_filter": False,
@@ -295,7 +296,21 @@ class ROBTranscriber:
 
         detected_language = getattr(info, "language", transcription_language)
         return Transcript(
-            text=text, language=detected_language, segments=timed_segments
+            text=text,
+            language=detected_language,
+            segments=timed_segments,
+            metadata=self._metadata(language_source),
+        )
+
+    def _metadata(self, language_source: Optional[str] = None) -> ASRMetadata:
+        # Neither Whisper log-probability nor a zero placeholder is reported as
+        # a transcript confidence. The existing ROB backend has no such score.
+        return ASRMetadata(
+            backend="whisper",
+            model=self.model_size,
+            language_source=language_source,
+            device=self.device,
+            compute_type=self.effective_compute_type,
         )
 
     @classmethod
@@ -320,9 +335,9 @@ class ROBTranscriber:
             for start in range(0, total_samples, cls.MAX_BATCHED_CHUNK_SAMPLES)
         ]
 
-    def _resolve_language(self, audio: "np.ndarray") -> str:
+    def _resolve_language(self, audio: "np.ndarray") -> tuple[str, str]:
         if self.model_size.endswith(".en"):
-            return "en"
+            return "en", "model"
         if self.language == "auto":
             return self._detect_language(audio, self.allowed_languages)
         if "," in self.language:
@@ -332,11 +347,11 @@ class ROBTranscriber:
                 if language.strip()
             )
             return self._detect_language(audio, requested)
-        return self.language
+        return self.language, "configured"
 
     def _detect_language(
         self, audio: "np.ndarray", allowed_languages: Sequence[str]
-    ) -> str:
+    ) -> tuple[str, str]:
         fallback = "en"
         try:
             detected, _, probabilities = self._model.detect_language(audio)
@@ -347,10 +362,10 @@ class ROBTranscriber:
                 if language in allowed
             ]
             if matches:
-                return max(matches, key=lambda item: item[1])[0]
-            return detected if not allowed else fallback
+                return max(matches, key=lambda item: item[1])[0], "detected"
+            return (detected, "detected") if not allowed else (fallback, "fallback")
         except Exception as exc:
             self._logger.warning(
                 "ASR language detection failed; using %s: %s", fallback, exc
             )
-            return fallback
+            return fallback, "fallback"

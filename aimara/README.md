@@ -420,6 +420,65 @@ once that environment's OpenCV/libpng installation is repaired.
 The command writes segment WAV files under `audio/` and the aligned transcript,
 timing, emotion, confidence, and class probabilities to `predictions.json`.
 
+### Speech metadata in prediction output
+
+Each new prediction includes the fields below in per-video JSON, combined JSON,
+and batch CSV. The existing `confidence` field remains the predicted emotion
+class probability; speech scores are separate diagnostics and do not filter
+turns or become emotion-model inputs.
+
+| Field | Meaning |
+| --- | --- |
+| `asr_backend`, `asr_model` | Backend and configured model identifier (`whisper` plus its model alias, or `parakeet` plus its repository/local checkpoint). Unknown for legacy/custom transcripts without metadata. |
+| `asr_device`, `asr_compute_type` | Selected device and effective model-loading precision argument, when known. |
+| `transcript_confidence` | Backend-reported score for the whole ASR input. Whisper reports `null`; Parakeet reports the mean of valid NeMo word-confidence values when available. Zero is a valid score. |
+| `transcript_confidence_method` | `mean_word_confidence` when a Parakeet score is present; otherwise `null`. |
+| `speaker_id_confidence` | Selected identity's match scores weighted by their scored coverage of the emitted segment. `-1` means unavailable; zero is a valid reported score. |
+| `language_source` | `configured`, `detected`, `model`, or `fallback`; `null` when unavailable. A configured Parakeet label is an assumption, while `model` denotes Whisper's English-only model restriction. |
+| `asr_input_start_time`, `asr_input_end_time` | Source-video boundaries of the original VAD interval sent to ASR. Every speaker group split from that decode shares these references and its transcript confidence. |
+| `start_time`, `end_time` | Source-video boundaries of this group's own WAV and visual interval. |
+| `confidence` | Emotion class probability, with its existing meaning. |
+
+Unavailable optional values are JSON `null` and blank CSV cells. The speaker
+score retains its explicit `-1` sentinel. Parakeet confidence errors trigger the
+existing retry without confidence; that recovered transcript has no score.
+Missing, malformed, or non-finite word scores also leave confidence unavailable
+while preserving text. These ASR and identity scores are not calibrated emotion
+probabilities and should not be compared directly with `confidence`.
+
+Speaker confidence uses `sum(overlap_samples * match_score) / segment_samples`
+for scored spans carrying the selected known identity. Gaps, other voices, and
+unscored spans reduce scored coverage; entirely unscored or UNKNOWN segments
+report `-1`. ReDimNet2's combined speaker intervals retain their individual
+probe confidence spans, so a score change or unscored stretch is not lost when
+adjacent labels are merged.
+
+For custom transcribers, attach immutable metadata explicitly:
+
+```python
+from aimara import ASRMetadata, Transcript
+
+transcript = Transcript(
+    "hello",
+    language="en",
+    metadata=ASRMetadata(
+        backend="custom",
+        model="model-id",
+        transcript_confidence=None,
+        language_source="configured",
+    ),
+)
+```
+
+`Transcript(text, language)` remains valid and defaults to unavailable metadata.
+The offline processor carries `Transcript.metadata` into each segment's
+`asr_metadata` and computes speaker confidence from the source-aligned timeline.
+`tests/test_speech_metadata.py` covers score availability, evidence coverage,
+ASR-input references, and JSON/CSV export through the pipeline. Adapter tests
+also cover language provenance and Parakeet's reported confidence and retry.
+Older cached predictions can lack these fields; use a fresh output directory to
+generate them, since resume still reuses old results without checking the schema.
+
 ## Batch evaluation
 
 The batch runner loads every model once and processes all MP4 files in one

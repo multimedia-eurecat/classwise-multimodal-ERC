@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
-from aimara import Transcript, TranscriptSegment, TranscriptWord
+from aimara import ASRMetadata, Transcript, TranscriptSegment, TranscriptWord
 from aimara.rob import ROBTranscriber, WhisperInferenceConfig
 
 
@@ -138,7 +138,14 @@ class ROBTranscriberTests(unittest.TestCase):
     def test_empty_backend_output_returns_empty_text_and_timing(self):
         transcriber = ROBTranscriber(model=FakeModel(texts=()), model_size="tiny.en")
         self.assertEqual(
-            transcriber.transcribe(self.audio(), 16000), Transcript("", "en")
+            transcriber.transcribe(self.audio(), 16000),
+            Transcript(
+                "",
+                "en",
+                metadata=ASRMetadata(
+                    backend="whisper", model="tiny.en", language_source="model"
+                ),
+            ),
         )
 
     def test_lazy_backend_failure_does_not_return_a_partial_transcript(self):
@@ -194,8 +201,35 @@ class ROBTranscriberTests(unittest.TestCase):
 
         result = transcriber.transcribe(self.audio(seconds=0.005), 16000)
 
-        self.assertEqual(result, Transcript(text="", language=None))
+        self.assertEqual(
+            result,
+            Transcript(text="", metadata=ASRMetadata(backend="whisper", model="tiny")),
+        )
         self.assertEqual(model.transcribe_calls, [])
+
+    def test_language_provenance_distinguishes_model_configuration_detection_and_fallback(
+        self,
+    ):
+        for model_size, language, source in (
+            ("tiny.en", "auto", "model"),
+            ("tiny", "en", "configured"),
+            ("tiny", "es,ca", "detected"),
+            ("tiny", "auto", "detected"),
+        ):
+            with self.subTest(model_size=model_size, language=language):
+                result = ROBTranscriber(
+                    model=FakeModel(), model_size=model_size, language=language
+                ).transcribe(self.audio(), 16000)
+                self.assertEqual(result.metadata.language_source, source)
+                self.assertIsNone(result.metadata.transcript_confidence)
+                self.assertEqual(result.metadata.backend, "whisper")
+                self.assertEqual(result.metadata.model, model_size)
+        model = FakeModel()
+        model.detect_language = Mock(side_effect=RuntimeError("no language result"))
+        result = ROBTranscriber(model=model, model_size="tiny").transcribe(
+            self.audio(), 16000
+        )
+        self.assertEqual(result.metadata.language_source, "fallback")
 
     def test_validates_audio_and_model_size(self):
         transcriber = ROBTranscriber(model=FakeModel(), model_size="tiny")
@@ -382,7 +416,8 @@ class ROBTranscriberTests(unittest.TestCase):
             inference_config=WhisperInferenceConfig(use_batched_inference=True),
         )
         self.assertEqual(
-            transcriber.transcribe(self.audio(0.005), 16000), Transcript("")
+            transcriber.transcribe(self.audio(0.005), 16000),
+            Transcript("", metadata=ASRMetadata(backend="whisper", model="tiny.en")),
         )
         self.assertEqual(base.transcribe_calls, [])
         self.assertEqual(batched.transcribe_calls, [])

@@ -2,7 +2,8 @@
 
 from .audio_io import decode_audio, write_wav
 from .domain import SpeechSegment
-from .diarization import SpeakerInterval
+from .speech_metadata import ASRMetadata
+from .diarization import SpeakerConfidenceSpan, SpeakerInterval
 from .erc_features import ConversationFeatures, ERCFeatureBridge, SegmentFeatureEncoder
 from .erc_model import ERCEmotionModel, ERCModelProfile, EmotionPrediction
 from .offline_processor import OfflineROBProcessor
@@ -24,6 +25,7 @@ from .speech_interfaces import (
 from .vad_processing import OfflineVADProcessor
 
 __all__ = [
+    "ASRMetadata",
     "decode_audio",
     "ConversationFeatures",
     "ERCFeatureBridge",
@@ -37,6 +39,7 @@ __all__ = [
     "SpeechSegment",
     "SpeakerDiarizer",
     "SpeakerInterval",
+    "SpeakerConfidenceSpan",
     "SpeakerSegmentationConfig",
     "SpeakerSegmenter",
     "SpeakerUtterance",

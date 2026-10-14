@@ -22,6 +22,16 @@ BASE_COLUMNS = (
     "speaker_id",
     "transcript",
     "language",
+    "asr_backend",
+    "asr_model",
+    "transcript_confidence",
+    "transcript_confidence_method",
+    "speaker_id_confidence",
+    "language_source",
+    "asr_device",
+    "asr_compute_type",
+    "asr_input_start_time",
+    "asr_input_end_time",
     "emotion",
     "confidence",
 )
@@ -45,11 +55,7 @@ def _write_combined(output_dir: Path, rows: list[dict], failures: list[dict]) ->
     _atomic_json(output_dir / "failures.json", failures)
 
     probability_names = sorted(
-        {
-            name
-            for row in rows
-            for name in row.get("probabilities", {}).keys()
-        }
+        {name for row in rows for name in row.get("probabilities", {}).keys()}
     )
     fieldnames = [*BASE_COLUMNS, *(f"probability_{name}" for name in probability_names)]
     csv_path = output_dir / "predictions.csv"
@@ -82,7 +88,8 @@ def run_batch(
 
     allowed = {extension.lower() for extension in extensions}
     videos = sorted(
-        path for path in video_dir.iterdir()
+        path
+        for path in video_dir.iterdir()
         if path.is_file() and path.suffix.lower() in allowed
     )
     if not videos:

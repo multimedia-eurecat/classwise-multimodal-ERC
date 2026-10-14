@@ -190,6 +190,10 @@ class ROBSpeakerDiarizerTests(unittest.TestCase):
             ],
         )
 
+        spans = timeline[1].confidence_spans
+        self.assertEqual(sum(s.duration_samples for s in spans), 32000)
+        self.assertGreater(len({s.confidence for s in spans}), 1)
+
     def test_overlapping_gallery_windows_and_probes_do_not_double_count_learning(self):
         from aimara.rob._voice_identity import VoiceIdentityManager
 

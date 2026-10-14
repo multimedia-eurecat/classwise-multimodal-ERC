@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Callable, List, Optional, Union
 
 from .audio_io import decode_audio, write_wav
 from .domain import SpeechSegment
+from .diarization import speaker_confidence_for_region
 from .speaker_segmentation import SpeakerSegmenter, SpeakerUtterance
 from .speech_interfaces import SpeakerDiarizer, Transcriber
 from .vad_processing import OfflineVADProcessor
@@ -102,6 +103,12 @@ class OfflineROBProcessor:
                         speaker_id=utterance.speaker_id,
                         transcript=utterance.text,
                         language=transcript.language,
+                        asr_metadata=transcript.metadata,
+                        speaker_id_confidence=speaker_confidence_for_region(
+                            speech_region, utterance.speaker_id, timeline
+                        ),
+                        asr_input_start_time=region.start_time(sample_rate),
+                        asr_input_end_time=region.end_time(sample_rate),
                     )
                 )
 

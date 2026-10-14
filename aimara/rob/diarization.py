@@ -7,7 +7,7 @@ import math
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Optional, Sequence, Union
 
-from ..diarization import SpeakerInterval
+from ..diarization import SpeakerConfidenceSpan, SpeakerInterval
 from ..segmentation import SpeechRegion
 
 if TYPE_CHECKING:
@@ -277,6 +277,7 @@ class ROBSpeakerDiarizer:
             confidence = (
                 -1.0 if result is None or result[1] < 0 else min(1.0, float(result[1]))
             )
+            spans = (SpeakerConfidenceSpan(start, end, confidence),)
             if (
                 timeline
                 and region_index == previous_region
@@ -284,7 +285,7 @@ class ROBSpeakerDiarizer:
             ):
                 previous = timeline.pop()
                 total = end - previous.start_sample
-                confidence = (
+                aggregate = (
                     (
                         previous.confidence * previous.duration_samples
                         + confidence * (end - start)
@@ -293,7 +294,9 @@ class ROBSpeakerDiarizer:
                     if confidence >= 0 and previous.confidence >= 0
                     else -1.0
                 )
+                spans = previous.confidence_spans + spans
+                confidence = aggregate
                 start = previous.start_sample
-            timeline.append(SpeakerInterval(start, end, speaker, confidence))
+            timeline.append(SpeakerInterval(start, end, speaker, confidence, spans))
             previous_region = region_index
         return timeline

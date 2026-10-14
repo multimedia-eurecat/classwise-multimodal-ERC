@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional, Protocol, Sequence
+
+from .speech_metadata import ASRMetadata
 
 if TYPE_CHECKING:
     import numpy as np
@@ -62,12 +64,15 @@ class Transcript:
     text: str
     language: Optional[str] = None
     segments: tuple[TranscriptSegment, ...] = ()
+    metadata: ASRMetadata = field(default_factory=ASRMetadata)
 
     def __post_init__(self) -> None:
         segments = tuple(self.segments)
         if any(not isinstance(segment, TranscriptSegment) for segment in segments):
             raise TypeError("segments must contain TranscriptSegment objects")
         object.__setattr__(self, "segments", segments)
+        if not isinstance(self.metadata, ASRMetadata):
+            raise TypeError("metadata must be ASRMetadata")
 
     @property
     def words(self) -> tuple[TranscriptWord, ...]:

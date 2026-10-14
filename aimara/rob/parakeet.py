@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
 from ..speech_interfaces import Transcript, TranscriptSegment, TranscriptWord
+from ..speech_metadata import ASRMetadata
 
 DEFAULT_PARAKEET_MODEL = "nvidia/parakeet-tdt-0.6b-v3"
 PARAKEET_LANGUAGES = frozenset(
@@ -189,14 +190,14 @@ class ParakeetTranscriber:
             }
         model.change_decoding_strategy(model.cfg.decoding, verbose=False)
 
-    def _transcribe_hypotheses(self, audio: Any) -> Sequence[Any]:
+    def _transcribe_hypotheses(self, audio: Any) -> tuple[Sequence[Any], bool]:
         import torch
 
         with torch.inference_mode():
             try:
                 return self.model.transcribe(
                     [audio], batch_size=1, return_hypotheses=True, verbose=False
-                )
+                ), True
             except (ValueError, RuntimeError) as exc:
                 if self.CONFIDENCE_AGGREGATION_ERROR not in str(exc):
                     raise
@@ -208,7 +209,7 @@ class ParakeetTranscriber:
                 try:
                     return self.model.transcribe(
                         [audio], batch_size=1, return_hypotheses=True, verbose=False
-                    )
+                    ), False
                 finally:
                     self._configure_decoding(self.model, word_confidence=True)
 
@@ -220,32 +221,64 @@ class ParakeetTranscriber:
         if sample_rate != self.SAMPLE_RATE:
             raise ValueError("Parakeet audio must use a 16000 Hz sample rate")
         if audio.size < round(sample_rate * self.MIN_TRANSCRIPTION_DURATION):
-            return Transcript("")
+            return Transcript("", metadata=self._metadata())
         try:
-            hypotheses = self._transcribe_hypotheses(audio)
+            hypotheses, confidence_available = self._transcribe_hypotheses(audio)
             if not hypotheses:
-                return Transcript("")
+                return Transcript("", metadata=self._metadata())
             if len(hypotheses) != 1:
                 raise ValueError(
                     "Parakeet must return one hypothesis for one audio region"
                 )
             result = self._to_transcript(hypotheses[0], audio.size / sample_rate)
+            if not confidence_available:
+                result = replace(result, metadata=self._metadata())
         except Exception as exc:
             raise RuntimeError("Parakeet transcription failed") from exc
         if not result.text:
             return result
-        return Transcript(result.text, self._identify_language(audio), result.segments)
+        language, language_source = self._identify_language(audio)
+        return replace(
+            result,
+            language=language,
+            metadata=replace(result.metadata, language_source=language_source),
+        )
 
-    def _identify_language(self, audio: Any) -> Optional[str]:
+    def _metadata(self, confidence: Optional[float] = None) -> ASRMetadata:
+        return ASRMetadata(
+            backend="parakeet",
+            model=self.config.model_name,
+            transcript_confidence=confidence,
+            confidence_method="mean_word_confidence"
+            if confidence is not None
+            else None,
+            device=self.device,
+            compute_type=self.effective_compute_type,
+        )
+
+    def _hypothesis_confidence(self, hypothesis: Any) -> Optional[float]:
+        scores = getattr(hypothesis, "word_confidence", None)
+        if scores is None:
+            return None
+        try:
+            values = [float(value) for value in scores]
+            if any(not math.isfinite(value) or not 0 <= value <= 1 for value in values):
+                raise ValueError("word confidences must be finite and between 0 and 1")
+            return math.fsum(values) / len(values) if values else None
+        except (ValueError, TypeError) as exc:
+            self._logger.warning("Parakeet confidence unavailable: %s", exc)
+            return None
+
+    def _identify_language(self, audio: Any) -> tuple[Optional[str], Optional[str]]:
         candidates = self.config.candidate_languages()
         if len(candidates) == 1:
             # A configured output label, not a detected or forced language.
-            return candidates[0]
+            return candidates[0], "configured"
         if (
             self.language_identifier is None
             or audio.size < self.MIN_LANGUAGE_ID_DURATION * self.SAMPLE_RATE
         ):
-            return None
+            return None, None
         try:
             probabilities = self.language_identifier.probabilities(audio, candidates)
             valid = {
@@ -256,10 +289,10 @@ class ParakeetTranscriber:
             if valid:
                 best = max(valid, key=valid.get)
                 if valid[best] >= self.config.language_id_min_confidence:
-                    return best
+                    return best, "detected"
         except Exception as exc:
             self._logger.warning("Parakeet language identification failed: %s", exc)
-        return None
+        return None, None
 
     def _entry_times(self, entry: dict) -> tuple[float, float]:
         if "start" in entry and "end" in entry:
@@ -275,7 +308,7 @@ class ParakeetTranscriber:
     def _to_transcript(self, hypothesis: Any, duration: float) -> Transcript:
         text = (getattr(hypothesis, "text", None) or "").strip()
         if not text:
-            return Transcript("")
+            return Transcript("", metadata=self._metadata())
         stamps = getattr(hypothesis, "timestamp", None)
         stamps = stamps if isinstance(stamps, dict) else {}
         words = tuple(
@@ -335,7 +368,11 @@ class ParakeetTranscriber:
             start = words[0].start_time if words else 0.0
             end = max(w.end_time for w in words) if words else duration
             segments = [TranscriptSegment(start, end, text, words)]
-        return Transcript(text, segments=tuple(segments))
+        return Transcript(
+            text,
+            segments=tuple(segments),
+            metadata=self._metadata(self._hypothesis_confidence(hypothesis)),
+        )
 
 
 class ParakeetLanguageIdentifier:

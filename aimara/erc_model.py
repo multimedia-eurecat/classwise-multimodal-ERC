@@ -50,6 +50,10 @@ class EmotionPrediction:
             "speaker_id": self.segment.speaker_id,
             "transcript": self.segment.transcript,
             "language": self.segment.language,
+            **self.segment.asr_metadata.to_dict(),
+            "speaker_id_confidence": self.segment.speaker_id_confidence,
+            "asr_input_start_time": self.segment.asr_input_start_time,
+            "asr_input_end_time": self.segment.asr_input_end_time,
             "emotion": self.emotion,
             "confidence": self.confidence,
             "probabilities": dict(zip(IEMOCAP_EMOTIONS, self.probabilities)),
@@ -83,9 +87,7 @@ class ERCEmotionModel:
             raise FileNotFoundError(f"ERC checkpoint not found: {checkpoint_path}")
 
         try:
-            state = torch.load(
-                checkpoint_path, map_location="cpu", weights_only=True
-            )
+            state = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
         except TypeError:
             state = torch.load(checkpoint_path, map_location="cpu")
         cls._validate_checkpoint(state, profile)
@@ -160,4 +162,6 @@ class ERCEmotionModel:
         for name, width in expected.items():
             actual = getattr(features, name).shape[1]
             if actual != width:
-                raise ValueError(f"{name} features have width {actual}; expected {width}")
+                raise ValueError(
+                    f"{name} features have width {actual}; expected {width}"
+                )
