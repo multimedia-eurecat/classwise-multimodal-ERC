@@ -1,5 +1,161 @@
 # AIMARA integration
 
+## Actual ROB engine replay → ERC
+
+Use `run_rob_native` when the purpose is to rehearse consumption of **ROB's
+actual segmentation**, rather than evaluate our separately adapted offline
+segmenter. It loads the unchanged `VADEngine`, `RediVoiceEngine`,
+`VoiceIdentityManager`, and `ASREngine`/`ParakeetASREngine` from a separate
+`EutSpeechAudioProcessing` checkout. The default required revision is
+`fd89b8b537c17b7ccd103310039ddcf6faf7aa4e`. A different HEAD or modified tracked
+speech/config files is rejected; source/config SHA-256 hashes are recorded.
+`--rob-revision` is an explicit opt-in to another reviewed revision, not a
+guarantee that its interface is compatible.
+
+ROB owns audio buffering, silence timers, speaker-change flushes, provisional
+and final identity observations, ASR word timing, UNKNOWN grace, and sentence
+grouping. The speech-activity `_vad_callback` and `_on_eut_speaker_changed`
+method bodies are loaded unchanged from ROB's `DiarizationNode` source, without
+importing ROS. Only message delivery and publisher plumbing are replaced with
+direct callbacks. This path does **not** call our `OfflineVADProcessor`,
+`ROBSpeakerDiarizer`, `SpeakerSegmenter`, or adapted transcriber wrappers.
+
+The checked-in ROB YAML supplies the settings: currently Whisper `turbo`,
+batched inference, the `en, es` language allow-list, 0.25 s ASR silence timeout,
+and 0.5 s onset pre-buffer. Overrides are explicit and saved. ROB selects its
+own device and applies its own precision fallback; for example, GTX 1080 Ti
+falls back from requested float16 to float32. `--device` controls ERC only;
+use `CUDA_VISIBLE_DEVICES` to choose the GPU visible to ROB.
+
+From the repository root, using the existing Whisper or CUDA runtime profile:
+
+```bash
+python -m aimara.run_rob_native \
+  --rob-repo /path/to/EutSpeechAudioProcessing \
+  --video /path/to/selfie-videos/*.mp4 \
+  --weights /tmp/aimara-rob-native-models \
+  --checkpoint /path/to/vit_softmax.pt \
+  --output-dir /tmp/aimara-native-results
+```
+
+Use `--audio-model /path/to/emotion2vec_plus_large` when the audio encoder is
+already cached locally. `--asr-backend parakeet` selects ROB's actual optional
+Parakeet engine and requires the Parakeet runtime dependencies. `--speech-only`
+omits ERC and does not require a checkpoint. Models download into the writable
+weights/cache directories on first use; supplying an existing cached ROB
+weights directory avoids downloading them again. ROS and DIART are unnecessary
+for this REDI native replay.
+
+Each recording gets a fresh worker process and a fresh, **session-only** voice
+gallery. Shared MongoDB identities, cross-robot synchronization, and robot
+self-voice filtering are outside this recording test, even if enabled in the
+deployment YAML. Those differences are explicit in `rob_capture.json`.
+VAD runs in its own spawned process, matching the separation of ROB's VAD node;
+otherwise GPU work in the other engines can artificially delay audio delivery.
+An explicit 512-sample silence warmup and a 2.016 s silence pre-roll precede
+the file with default settings; at least 2 s of tail silence permits final
+turns and timers to finish. Speech is fed at 512 samples per 32 ms, using real
+clocks and actual background workers. Delivery lateness and maximum VAD backlog
+are recorded. Queue overflow, logged engine errors and unfinished workers fail
+the replay instead of producing an apparently successful observation.
+
+The read-only group observer exports the **final** grouping attempt after
+ROB's speaker-grace retries, and forwards ROB's existing transcript callback
+arguments unchanged. It exports internal input-start wall clocks plus group
+offsets. Publication timestamps alone cannot provide these boundaries.
+`observe_groups(engine, callback)` in `rob_native_export.py` can also be attached
+to a live ROS-owned engine before audio starts; it does not replace that node's
+normal transcript publication. A ROS integration must additionally establish
+the original media clock for alignment. The hook observes engine groups before
+ROS-node self-voice filtering; if robot speech is active, a deployment collector
+must also honor that node's accepted/dropped transcript decisions.
+
+ERC retains ROB's text, groups, identities, gaps and overlaps. It extracts WAVs
+and visual features over the exported source intervals, rounds to audio samples,
+and clips only to physical media edges. `erc_bounds.json` records those changes.
+ROB's internal clocks/word estimates are not human-verified word boundaries.
+The exported groups are ordered by start time for the ERC conversation, without
+merging adjacent groups or smoothing their labels. Literal UNKNOWN is normalized
+for ERC's existing omit-embedding policy.
+
+The checkpoint still supports **two known speakers plus UNKNOWN**. If ROB emits
+three known identities, that video's speech results are preserved and its ERC
+failure is recorded; identities are never collapsed to force a prediction.
+Other videos continue. The command exits nonzero when any ERC video fails, even
+when all speech replays succeeded. ERC processes each completed conversation;
+this is not yet incremental online emotion inference.
+
+Outputs are:
+
+- `rob_native.csv`: the same six columns as the reference CSV; emotions are blank
+  for speech-only runs or explicitly failed ERC videos.
+- `run_report.json`: overall result, per-video group counts, timing and ERC status.
+- `index.html`: portable inspection with original videos, four aligned timeline
+  lanes (reference turns, ASR input regions, raw speaker activity, final ERC
+  groups), clickable intervals, extracted audio, transcripts, emotions, and
+  per-video failures. Overlapping intervals are stacked; playback moves the
+  timeline cursors together.
+- `<video>/rob_capture.json`: pinned source fingerprints, selected settings,
+  raw final groups, speech-activity events and VAD observations.
+- `<video>/rob.log`, `audio/*.wav`, `erc_bounds.json`, `predictions.json`, and
+  `erc_result.json`: diagnostics, exact extracted samples, and ERC results.
+
+`--import-only` consumes successful saved captures for the selected videos and
+reruns only materialization/ERC. It rejects ASR overrides because it cannot
+change how those captures were produced. There is no implicit native replay
+resume: an ordinary invocation performs new speech runs. Keep a separate output
+directory when comparing configurations.
+
+This provides actual-engine integration evidence. **ROS message scheduling,
+QoS, deployment identity galleries, target robot hardware, and live ERC latency
+still require an on-stack integration test.**
+
+The 15 October 2026 validation used the configured Whisper `turbo`, language
+allow-list and batching on the CUDA runtime (effective float32 on GTX 1080 Ti).
+All **10 speech replays and 10 ERC conversations passed**, producing **33 final
+groups**. Maximum audio-delivery lateness was 3.45 ms; no audio chunk was more
+than 32 ms late and no VAD queue overflowed. The acceptance suite passed
+**227 tests with zero skips**. The versioned
+[`rob_native_results.json`](rob_native_results.json) preserves source hashes,
+settings, versions, per-video outputs, and artifact fingerprints. These are
+integration observations, not an ERC accuracy or live-latency benchmark.
+
+On this workstation, the portable inspection page and six-column CSV are under
+`docs/segmentation_review/rob_native/whisper_final/`. With the existing viewer
+server and SSH tunnel, open
+`http://localhost:8000/rob_native/whisper_final/`. The CSV is `rob_native.csv`.
+The main segmentation viewer also links to this native-engine run. Earlier
+development attempts are preserved separately and are not the validated run.
+
+Supply `--reference-csv /path/to/selfie-videos.csv` to `run_rob_native` to include
+annotations in the review. This affects visualization only. To rebuild an
+existing report without replaying speech or rerunning ERC:
+
+```bash
+python -m aimara.rob_native_review \
+  --output-dir docs/segmentation_review/rob_native/whisper_final \
+  --reference-csv /path/to/selfie-videos.csv
+```
+
+The CSV is copied to `reference.csv`, and `review_timelines.json` records its
+hash, the rendering source hash, input capture/bounds hashes, and plotted
+intervals. Subsequent rebuilds can use the saved snapshot without the flag or
+access to the original video directory. The current native review uses the
+**30-turn** reference; the older main viewer retains its original 31-turn
+evaluation snapshot.
+
+**Raw speaker timeline means diarization activity before final sentence
+grouping**, not emotion predictions or ASR segments. For these saved native
+captures, it is a retrospective reconstruction from ROB's activity events in
+delivery order. Heartbeats extend active runs, stop events close them, and
+backdated labels revise earlier intervals. It is not the exact internal ASR
+speaker timeline at every inference instant: those intermediate states and
+event arrival times were not captured. Uncolored raw gaps mean no recorded
+active identity; they do not by themselves establish silence or missing speech.
+Reference IDs 0/1 are independent of ROB's session speaker IDs. The ASR lane
+deduplicates recorded input bounds shared by final groups; empty/unpublished
+transcription calls are absent from these older captures.
+
 `prepare_manifest.py` converts the synthetic-video reference annotations into a
 manifest shared by the baseline and ROB speech-enhanced pipelines. It accepts
 both comma- and semicolon-delimited AIMARA CSV files, references the original
@@ -925,7 +1081,110 @@ Its eight-second clips also do not establish batching throughput on long speech.
 A separate held-out target-domain set and agreed quality thresholds are needed
 before selecting production defaults.
 
-The output root contains combined `predictions.csv`, `predictions.json`, and
+## Segmentation CSV comparison and diagnostic replay
+
+`compare_segmentation` exports saved speaker-aware outputs in the reference CSV's
+`video_file,start,end,speaker,text,emotion` format and traces which stage retains
+or loses each reference text-turn change. It does not load neural models or
+change runtime segmentation settings:
+
+```bash
+python -m aimara.compare_segmentation \
+  --reference-csv /media/ssd2/AIMARA/input_csv/selfie-videos.csv \
+  --original-reference-csv /media/ssd2/AIMARA/input_csv/selfie-videos_orig.csv \
+  --smoke-report /tmp/aimara-12c/whisper-redimnet2-cuda/smoke_report.json \
+  --smoke-report /tmp/aimara-12b-v2/parakeet-redimnet2-cuda/smoke_report.json \
+  --output-dir /tmp/aimara-segmentation-comparison
+```
+
+Outputs include `new_pipeline_whisper.csv`, `new_pipeline_parakeet.csv`,
+`comparison_by_reference_turn.csv`, `boundary_diagnosis.csv`, `word_trace.csv`,
+`segmentation_stages.csv`, `diagnostic_replays.csv`, `summary.csv`, a provenance
+record in `diagnosis.json`, and a browser-readable `index.html`. The `emotion`
+column in the two pipeline CSVs is the saved model prediction, not the reference
+label. Diagnostic replays contain no recomputed emotion labels. Reference-turn,
+reference-boundary and output-group identifiers are zero-based.
+
+The actual grouping is replayed first and must exactly reproduce saved group
+times, text and speaker labels. Controlled alternatives reuse the same ASR
+observations: sentence majority without the credible-trailing-speaker override,
+unsmoothed word runs, and an explicitly annotation-based reference-speaker
+timeline. That last replay is a counterfactual, not an independent model result.
+Reference text is aligned to saved ASR words by global edit alignment; English
+number words zero through ten and their digits are treated as equivalent for
+this structural comparison. This avoids shifting a turn boundary because one
+transcript says `four. All right` and another says `4. Alright`. It does not
+change the WER definition or results reported in step 12C.
+
+The current CSV has 30 turns; the 14 October evaluation used the preserved
+31-turn snapshot. The change merges/relabels the early `Surprise.mp4` turns.
+Both snapshots are retained by the comparison; historical validation receipts
+remain unchanged. These annotations include pauses and have no independently
+verified word times. Uncovered reference duration and small endpoint differences
+therefore require audio review and do not establish missing speech.
+
+On the saved CUDA runs, both backends retain multiple ASR text segments in
+`Excited.mp4` and `Happy.mp4`, but the raw speaker assignments cause the final
+speaker groups to collapse. For `Sadness.mp4`, the Whisper replay loses a turn
+change through the credible-trailing-speaker rule; disabling only that override
+restores it with identical saved words and diarization. This local replay
+isolates a grouping effect, while the acoustic correctness of the competing
+word and diarization times still requires manual inspection. Six diagnostic
+tests cover this distinction, exact replay, numeric alignment, pause handling
+and rejection of ambiguous ASR-input associations.
+
+For normal pipeline batch runs, the output root contains combined
+`predictions.csv`, `predictions.json`, and
 `failures.json` files. Each video also receives its own directory containing
 segment WAVs and its individual `predictions.json`. A failure is recorded and
 does not stop later videos from running.
+
+## Transcript-aligned emotion evaluation
+
+`evaluate_emotions.py` evaluates ground-truth turns **1 and 3** for each video.
+It joins exact video basenames and aligns all three reference transcripts to
+the predicted text in order. Reference timings and speaker IDs do not influence
+matching. The phone response anchors alignment but is excluded from scoring.
+Split, merged, and cross-boundary predictions produce one result row per
+target-turn/predicted-segment overlap, including the matched text fragments.
+
+Using the existing AIMARA runtime from the repository root:
+
+```bash
+python -m aimara.evaluate_emotions \
+  --reference /media/ssd2/AIMARA/input_csv/selfie-videos.csv \
+  --prediction IEMOCAP=docs/emotion_evaluation/model_runs/iemocap/predictions.csv \
+  --labels IEMOCAP=happy,sad,neutral,angry,excited,frustrated \
+  --prediction MELD=docs/emotion_evaluation/model_runs/meld/predictions.csv \
+  --labels MELD=neutral,surprise,fear,sadness,joy,disgust,anger \
+  --output-dir docs/emotion_evaluation
+```
+
+The shared, configurable `emotion_circumplex.json` contains engineering
+prototype angles, not empirical class centroids. Angular score is
+`1 - shortest_angle_degrees / 180`. Neutral has no angle: angular fields remain
+blank, while the overall score gives neutral-neutral 1 and neutral-emotional
+mismatches 0. Joy and happy are label synonyms; excited remains distinct.
+Each target's score weights its matched segments by matched-token count;
+overall means give each eligible target equal weight. Text coverage is reported
+separately, with an optional coverage-adjusted score. Entirely unmatched targets
+remain in the denominator with score 0. Categorical accuracy measures
+matched-token-weighted canonical-label correctness within each target.
+
+`summary.csv` includes each checkpoint's supported ground-truth subset and
+their common canonical-label subset. `matched_segments.csv` preserves every
+overlap, raw/canonical labels, eligibility, angular error, score, and model
+provenance. `target_utterances.csv`, `by_emotion.csv`, `unused_predictions.csv`,
+and `evaluation.json` provide aggregation, exclusions, methodology, and hashes.
+The output also snapshots the exact reference and angle mapping.
+
+`run_emotion_checkpoints.py` runs the local IEMOCAP and MELD checkpoints on the
+saved native ROB segments, sharing text/audio/visual features and preserving
+all speech inputs. It does not rerun speech inference. Its CLI requires
+`--input-dir`, `--model-cache`, and a fresh `--output-dir`; use `--help` for
+device/checkpoint options. Existing inference outputs are never overwritten.
+On this workstation the established runtime is
+`/media/ssd2/oriol/sdt_env/bin/python`. The supplied CSV is evaluated separately
+under `docs/emotion_evaluation/supplied_baseline/` because its original checkpoint
+identity was not recorded. `docs/emotion_evaluation/reproduce.sh` re-scores the
+saved predictions without rerunning either checkpoint.

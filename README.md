@@ -26,11 +26,18 @@ video
   -> timestamped emotion predictions
 ```
 
-Only the Python logic required for VAD and ASR was adapted from
+The original offline path adapts the Python logic required for VAD and ASR from
 [`Eurecat/eut_speech_audio_processing`](https://github.com/Eurecat/eut_speech_audio_processing).
 ROS is deliberately kept outside this branch. A future ROB adapter can translate
 between ROS messages and the Python contracts without coupling the emotion model
 to ROS during development.
+
+For a closer integration rehearsal, `python -m aimara.run_rob_native` loads the
+actual engines from a pinned `EutSpeechAudioProcessing` checkout. ROB owns
+buffering, VAD, online speaker identity, ASR and final grouping; ERC consumes
+the exported groups. This runner uses real-time file replay and direct callbacks,
+with VAD in a separate process. It does not validate ROS transport. See
+[native ROB replay](aimara/README.md#actual-rob-engine-replay--erc).
 
 ### What this branch adds
 
@@ -52,6 +59,7 @@ The integration lives under [`aimara/`](aimara/). Its main components are:
 - `erc_model.py`: checkpoint validation and timestamp-aligned emotion predictions.
 - `pipeline.py`: complete ROB-to-ERC orchestration.
 - `run_pipeline.py` and `run_batch.py`: single-video and resumable directory execution.
+- `rob_native.py`, `rob_native_export.py`, and `run_rob_native.py`: actual ROB engine replay, final-group export, and ERC-only consumption.
 
 Detailed setup, commands, model locations, output formats, and the current
 OpenCV environment workaround are documented in
@@ -72,9 +80,10 @@ its fixtures, reports and completion criteria.
 - A batch run processed all 10 clean `selfie-videos` without pipeline failures.
 - Per-video and combined JSON/CSV outputs preserve VAD timing, transcripts,
   emotion predictions, confidence values, and class probabilities.
-- The automated suite currently contains 210 passing tests covering contracts,
+- The automated suite currently contains 258 passing tests covering contracts,
   VAD/ASR adapters, segmentation, feature alignment, checkpoint validation,
-  orchestration, failure handling, resume behavior, and quality metrics.
+  orchestration, failure handling, resume behavior, quality metrics, and
+  saved-observation segmentation diagnosis, and actual ROB group export/replay.
 - Reference scoring and configuration comparisons on the ten clean clips are
   documented in [step 12C](aimara/README.md#reference-quality-and-performance-step-12c).
 

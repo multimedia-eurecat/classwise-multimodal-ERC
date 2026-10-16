@@ -1,0 +1,31 @@
+{
+  "version": "aimara-prototype-circumplex-v1",
+  "description": "Fixed engineering prototypes for transcript-aligned categorical emotion evaluation. Angles are measured counterclockwise from positive valence (0 degrees), with positive arousal at 90 degrees. These rounded, configurable angles express broad valence/arousal relationships; they are not published empirical class centroids, a universal standard, or fitted to these test predictions. The same table is used for all checkpoints. Happy and joy are treated as label synonyms; excitement remains distinct. Surprise is assigned high arousal and neutral valence although its valence depends on context. Neutral is the origin and has no angle. Russell (1980) supports the circumplex geometry and neutral origin, not every numeric prototype below. The repository's IEMOCAP and MELD VA priors are not used because they have different scales and positions for shared labels.",
+  "source_urls": [
+    "https://doi.org/10.1037/h0077714",
+    "https://pdodds.w3.uvm.edu/research/papers/others/1980/russell1980a.pdf"
+  ],
+  "angles": {
+    "happy": 15.0,
+    "excited": 45.0,
+    "surprise": 90.0,
+    "fear": 120.0,
+    "anger": 135.0,
+    "frustrated": 165.0,
+    "disgust": 180.0,
+    "sadness": 225.0,
+    "neutral": null
+  },
+  "aliases": {
+    "angry": "anger",
+    "happiness": "happy",
+    "joy": "happy",
+    "joyful": "happy",
+    "excitement": "excited",
+    "surprised": "surprise",
+    "fearful": "fear",
+    "frustration": "frustrated",
+    "disgusted": "disgust",
+    "sad": "sadness"
+  }
+}
