@@ -9,7 +9,7 @@ from typing import Union
 
 from .erc_features import ERCFeatureBridge
 from .erc_model import ERCEmotionModel, EmotionPrediction
-from .offline_processor import OfflineROBProcessor
+from .speech_interfaces import SpeechProcessor
 
 
 class AIMARAPipeline:
@@ -17,7 +17,7 @@ class AIMARAPipeline:
 
     def __init__(
         self,
-        speech_processor: OfflineROBProcessor,
+        speech_processor: SpeechProcessor,
         feature_bridge: ERCFeatureBridge,
         emotion_model: ERCEmotionModel,
         *,

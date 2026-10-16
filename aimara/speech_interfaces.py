@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Protocol, Sequence
 
 from .speech_metadata import ASRMetadata
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
 
     from .diarization import SpeakerInterval
     from .segmentation import SpeechRegion
+    from .domain import SpeechSegment
 
 
 @dataclass(frozen=True)
@@ -120,6 +122,14 @@ class VoiceActivityDetector(Protocol):
     """Return a speech probability for one audio chunk."""
 
     def predict(self, audio: np.ndarray, sample_rate: int) -> float: ...
+
+
+class SpeechProcessor(Protocol):
+    """Produce finalized speech groups for ERC, independent of their origin."""
+
+    def process_video(
+        self, video_path: str | Path, output_dir: str | Path
+    ) -> Sequence[SpeechSegment]: ...
 
 
 class Transcriber(Protocol):

@@ -12,3 +12,10 @@ matcher; its optional MongoDB and fleet synchronization paths are not activated.
 Sentence grouping and short-run smoothing in aimara/speaker_segmentation.py are
 adapted from ASREngine in the same upstream commit:
   speech_recognition/speech_recognition/asr_engine.py
+
+aimara/rob_native.py loads the original ASR, VAD, REDI, and identity engines
+directly from a separately installed checkout at this same pinned commit. It
+also compiles the unchanged _vad_callback and _on_eut_speaker_changed method
+bodies from upstream DiarizationNode for replay without ROS transport. That
+source remains covered by the upstream Apache License 2.0. The local replay
+scheduler and read-only group export are AIMARA integration code.

@@ -408,6 +408,25 @@ def build_pipeline(args: argparse.Namespace) -> AIMARAPipeline:
         ),
     )
 
+    feature_bridge, emotion_model, profile = build_erc_components(args)
+    resume_config = build_resume_config(
+        args,
+        speech_config=config,
+        speaker_config=speaker_config,
+        asr_config=asr_config,
+        transcriber=transcriber,
+        feature_bridge=feature_bridge,
+        emotion_model=emotion_model,
+        profile=profile,
+        diarizer=speech_processor.diarizer,
+    )
+    return AIMARAPipeline(
+        speech_processor, feature_bridge, emotion_model, resume_config=resume_config
+    )
+
+
+def build_erc_components(args):
+    """Load only ERC and its encoders, independent of speech processing."""
     profile = ERCModelProfile()
     emotion_model = ERCEmotionModel.from_checkpoint(
         args.checkpoint,
@@ -429,20 +448,7 @@ def build_pipeline(args: argparse.Namespace) -> AIMARAPipeline:
             args, "unknown_speaker_policy", "omit_embedding"
         ),
     )
-    resume_config = build_resume_config(
-        args,
-        speech_config=config,
-        speaker_config=speaker_config,
-        asr_config=asr_config,
-        transcriber=transcriber,
-        feature_bridge=feature_bridge,
-        emotion_model=emotion_model,
-        profile=profile,
-        diarizer=speech_processor.diarizer,
-    )
-    return AIMARAPipeline(
-        speech_processor, feature_bridge, emotion_model, resume_config=resume_config
-    )
+    return feature_bridge, emotion_model, profile
 
 
 def main() -> int:
