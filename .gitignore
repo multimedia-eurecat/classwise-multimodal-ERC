@@ -1,3 +1,7 @@
 __pycache__/
 *.py[cod]
 .venv-aimara-*/
+/outputs/
+/.cache/
+/checkpoints/
+/data/

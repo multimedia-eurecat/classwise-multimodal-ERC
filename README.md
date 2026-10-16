@@ -74,6 +74,16 @@ from the repository root for the regression and generated-media acceptance suite
 The [acceptance guide](aimara/README.md#acceptance-validation-step-12a) describes
 its fixtures, reports and completion criteria.
 
+### Optimized annotated-input evaluation
+
+The source-only evaluator is maintained under
+[`aimara/optimized_evaluation/`](aimara/optimized_evaluation/README.md).
+Run `python -m aimara.optimized_evaluation --help` for independent IEMOCAP/MELD
+baseline/full profiles, explicit model assets, stage timing and resume checks.
+Its setup works from an extracted checkout; pretrained assets and data are
+separate inputs. This measures reference-annotated ERC inputs. The speech
+pipeline's end-to-end benchmark remains available separately.
+
 ### Current validation status
 
 - The complete pipeline has been exercised on the synthetic `Anger.mp4` video.

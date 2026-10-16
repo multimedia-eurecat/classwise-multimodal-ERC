@@ -1188,3 +1188,12 @@ On this workstation the established runtime is
 under `docs/emotion_evaluation/supplied_baseline/` because its original checkpoint
 identity was not recorded. `docs/emotion_evaluation/reproduce.sh` re-scores the
 saved predictions without rerunning either checkpoint.
+
+## Optimized annotated-input evaluator
+
+The maintained implementation now lives in [optimized_evaluation/](optimized_evaluation/README.md).
+Use `python -m aimara.optimized_evaluation` from the repository root. The guide
+covers fresh environments, required weights, all four profiles and portable
+asset/runtime options; the evaluator no longer needs the workstation evaluation
+folder, Python bytecode, or private model-source checkouts. This is the
+reference-annotated evaluation; the ROB speech pipeline remains separate.

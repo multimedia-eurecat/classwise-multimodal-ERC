@@ -1,0 +1,147 @@
+{
+  "date": "2026-10-16",
+  "all_passed": true,
+  "validation_kind": "source_portability",
+  "repository_tests": 284,
+  "focused_tests": 26,
+  "relocation": "Copied source to a different directory; launched outside the checkout; no pyc files or private model code allowed",
+  "source_sha256": {
+    "aimara/optimized_evaluation/__init__.py": "3e11cd7ee4dee94ea4750e698efd40045d7e2237810bd973341d0f51e0046d71",
+    "aimara/optimized_evaluation/__main__.py": "cecc58198595a5b937f19988d61d9815ade85369d3e68d92c1d91097b0c54c92",
+    "aimara/optimized_evaluation/active_speaker.py": "010090e425f5db1756a7679c4f28591471ec52a85bc4f46efa5d2e5303f02415",
+    "aimara/optimized_evaluation/au_features.py": "b1cb71ea3a3900d55d350c3078909d64dddb96a3339460214d08e1de37a7a8f8",
+    "aimara/optimized_evaluation/eval_metrics.py": "60fc19bb9da4d93308c7c66f58c7bcf9f27e997f3e9325770bef7dc3828f62ac",
+    "aimara/optimized_evaluation/extract_action_units.py": "4ec77c7a76506b27cce5ad05afe372c3eb179aa0656a3542e1d8c2aa22133961",
+    "aimara/optimized_evaluation/extract_audio.py": "42b296610a68830e78ffe74bb1e99d5ad124e4390cdd82ec43bf35e318ae8b24",
+    "aimara/optimized_evaluation/extract_text.py": "bb7701dadcb36472877ebadd84bd76bfa04465ed61d8775e7092c23f1211c533",
+    "aimara/optimized_evaluation/extract_visual.py": "953e1ae5d67e9f481a721506fe0b0952a3f1a89270242a15a1bf9a064ff493f5",
+    "aimara/optimized_evaluation/landmarks.py": "2fa0f1aa825d8e427b52e4440ed81ee03a1e184591e9bb229105a10aa7ab60f8",
+    "aimara/optimized_evaluation/merge_pkl.py": "bf33e67ced790819959264745161c048c06f1c2ae41bb34c3e67c8314a28bab2",
+    "aimara/optimized_evaluation/run_evaluation.py": "0bd691597ac0218b60a619989e38b01a7b9542b45ed67219436c6802889072a4",
+    "aimara/optimized_evaluation/run_inference.py": "7b5181f980502c4942f0bca1870d92928c9e4ea5d26090b5ba71037b61617bd5",
+    "aimara/optimized_evaluation/third_party/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "aimara/optimized_evaluation/third_party/light_asd/Classifier.py": "21fdebc3c08ee3a386111719035f06461b29548b9b900eff3e17e4083f4377f8",
+    "aimara/optimized_evaluation/third_party/light_asd/Encoder.py": "c4a85b8aa5eaab428f79836c5d9511a01ac45bfeb6dccc75e06c1e9eff25520c",
+    "aimara/optimized_evaluation/third_party/light_asd/Model.py": "7a419abda6f2701206b6c5bcf7a0665fc647c1dc49a5c52d9226afaba64fe568",
+    "aimara/optimized_evaluation/third_party/light_asd/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "aimara/optimized_evaluation/third_party/light_asd/loss.py": "155200fa5b19dc2405ff5f46c2028db6d3f111e8a3b04d5161af961ec80599aa",
+    "aimara/optimized_evaluation/third_party/tddfa/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "aimara/optimized_evaluation/third_party/tddfa/geometry.py": "6a98c2bacbdf20d6bbf3015c132441bd93694e87d8a3d7d636f560d9080d2d61",
+    "aimara/optimized_evaluation/visual_cache.py": "d3ebcb0f4dbaef251d202afeaca2a8a06bbfecde1b3cf5e7a670364786644449"
+  },
+  "extracted_runs": [
+    {
+      "profile": "iemocap-full",
+      "passed": true,
+      "videos": 1,
+      "utterances": 3,
+      "private_code_import_guard": true,
+      "report_sha256": "fb3dfdeb9417e4f554e018816877de1498e03d1f11b2b266fa8a887e43425261",
+      "features": {
+        "text": {
+          "dimension": 1024,
+          "zero_vectors": 0,
+          "sha256": "9b5136a6c2b69bd50c5eb58dd57f7e6e118fa1dad673fcfde3546da95f1c4e2e"
+        },
+        "audio": {
+          "dimension": 1024,
+          "zero_vectors": 0,
+          "sha256": "ce21450194e5ac423ae6094b739e0b52896a5a46cdcc4abbb90d51703aa5a0e6"
+        },
+        "visual_vit": {
+          "dimension": 768,
+          "zero_vectors": 0,
+          "sha256": "8b5f90f84b9379d13ce46516e8f80e1a5382e5880a11e031179893da6d1d6335"
+        },
+        "visual_landmarks": {
+          "dimension": 408,
+          "zero_vectors": 0,
+          "sha256": "5b76b0acf6765301fa6327c6018055958f9519a40446140ec8fbfa8c7b950bdc"
+        }
+      },
+      "legacy_embeddings_exact": true
+    },
+    {
+      "profile": "meld-full",
+      "passed": true,
+      "videos": 1,
+      "utterances": 3,
+      "private_code_import_guard": true,
+      "report_sha256": "f3529e6e265b7e1f1926b412ab89d51e3a61ddd7ba295dcbad646e07e409ffd7",
+      "features": {
+        "text": {
+          "dimension": 1024,
+          "zero_vectors": 0,
+          "sha256": "9b5136a6c2b69bd50c5eb58dd57f7e6e118fa1dad673fcfde3546da95f1c4e2e"
+        },
+        "audio": {
+          "dimension": 1024,
+          "zero_vectors": 0,
+          "sha256": "ce21450194e5ac423ae6094b739e0b52896a5a46cdcc4abbb90d51703aa5a0e6"
+        },
+        "visual_vit": {
+          "dimension": 768,
+          "zero_vectors": 0,
+          "sha256": "8b5f90f84b9379d13ce46516e8f80e1a5382e5880a11e031179893da6d1d6335"
+        },
+        "visual_action_units": {
+          "dimension": 60,
+          "zero_vectors": 0,
+          "sha256": "996904ee81c463377d2444be1867658f57cfc9413a4b4438a8aaffa8e6fb7c0b"
+        }
+      },
+      "legacy_embeddings_exact": true
+    }
+  ],
+  "checkpoint_parity": [
+    {
+      "profile": "iemocap-base",
+      "passed": true,
+      "predictions": 6,
+      "max_probability_difference": 0
+    },
+    {
+      "profile": "iemocap-full",
+      "passed": true,
+      "predictions": 6,
+      "max_probability_difference": 0
+    },
+    {
+      "profile": "meld-base",
+      "passed": true,
+      "predictions": 6,
+      "max_probability_difference": 0
+    },
+    {
+      "profile": "meld-full",
+      "passed": true,
+      "predictions": 6,
+      "max_probability_difference": 0
+    }
+  ],
+  "fresh_au": {
+    "pip_check": true,
+    "imports": true,
+    "real_inference": {
+      "passed": true,
+      "shape": [
+        20
+      ],
+      "nonzero_values": 12,
+      "weights": "Preexisting binary model assets copied into fresh environment; package source was installed from PyPI"
+    },
+    "versions": {
+      "torch": "2.4.1+cpu",
+      "torchvision": "0.19.1+cpu",
+      "py-feat": "0.6.1",
+      "nltools": "0.4.7",
+      "nilearn": "0.10.4",
+      "numpy": "1.26.4",
+      "scipy": "1.11.4",
+      "scikit-learn": "1.7.2",
+      "opencv-python-headless": "4.10.0.84"
+    },
+    "requirements_sha256": "a5c9bb7193586b61134f75cd5ddf26f74825f57b6fc1f57c1744b0917db44794"
+  },
+  "scope": "Functional source-portability and prediction-parity checks. Pretrained assets remain separate. No mobile or controlled performance claim."
+}

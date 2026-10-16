@@ -1,0 +1,18 @@
+# Separate Python 3.10 AU runtime. Install the matching Torch/Torchvision
+# build first. This profile deliberately does not inherit the main runtime's
+# SciPy constraint: py-feat 0.6.1 still imports scipy.integrate.simps.
+py-feat==0.6.1
+nltools==0.4.7
+nilearn==0.10.4
+numpy==1.26.4
+scipy==1.11.4
+pandas==2.3.3
+Pillow==10.2.0
+opencv-python-headless==4.10.0.84
+scikit-learn==1.7.2
+scikit-image==0.25.2
+numexpr==2.8.4
+kornia==0.8.2
+xgboost==3.2.0
+matplotlib==3.10.9
+seaborn==0.13.2

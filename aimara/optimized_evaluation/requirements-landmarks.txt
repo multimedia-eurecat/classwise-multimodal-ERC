@@ -1,0 +1,3 @@
+# Install a matching Torch build first, as described in README.md.
+-r ../requirements-base.txt
+onnxruntime==1.23.2

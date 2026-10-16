@@ -1,0 +1,17 @@
+{
+  "repository": "https://github.com/cleardusk/3DDFA_V2",
+  "license": "MIT",
+  "files": [
+    "utils/functions.py: crop_img, parse_roi_box_from_bbox",
+    "utils/tddfa_util.py: _parse_param, similar_transform"
+  ],
+  "upstream_sha256": {
+    "utils/functions.py": "4245b8c58d77e1952de5f9c1a10be381c7a9c34e1f1bcc5317c591f86c524790",
+    "utils/tddfa_util.py": "21a2031a612d1ab6e0a4863f68bf83acff7ee28bc3e653df429c9c9009eed880",
+    "TDDFA_ONNX.py": "d6dd000db9e64f7e6e80387cd983b4c334460f157f83077833b6f84777e70de4",
+    "bfm/bfm.py": "9556848236c6900ed99d1f3c3884882fba5003bf1ff8d7b8cfc2425accd794d3"
+  },
+  "changes": [
+    "Kept only pure NumPy geometry helpers; sparse ONNX/BFM loading is implemented in landmarks.py. No weights are redistributed."
+  ]
+}

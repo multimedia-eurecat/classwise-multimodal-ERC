@@ -1,0 +1,15 @@
+{
+  "repository": "https://github.com/Junhua-Liao/Light-ASD",
+  "commit": "ed38c232de5efe0261dbd68627c0ade7cdfe14eb",
+  "license": "MIT",
+  "changes": [
+    "Normalized newlines and changed Model.py imports to package-relative imports."
+  ],
+  "upstream_sha256": {
+    "model/Model.py": "6094bfaab7d5a701e1580ee6ec89c7cfea2baacf62b3ceafff5558f31dd3fc8d",
+    "model/Encoder.py": "c4a85b8aa5eaab428f79836c5d9511a01ac45bfeb6dccc75e06c1e9eff25520c",
+    "model/Classifier.py": "21fdebc3c08ee3a386111719035f06461b29548b9b900eff3e17e4083f4377f8",
+    "loss.py": "155200fa5b19dc2405ff5f46c2028db6d3f111e8a3b04d5161af961ec80599aa",
+    "LICENSE": "3c5b187c06d6c0fdcfe02ad73f51470eaa35045cc2e60749d805332d98441eb1"
+  }
+}
